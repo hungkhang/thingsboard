@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,13 +14,13 @@
 /// limitations under the License.
 ///
 
-import { NotificationDeliveryMethod, NotificationTemplate, NotificationType } from '@shared/models/notification.models';
+import { NotificationTemplate, NotificationType } from '@shared/models/notification.models';
 import { Component, Inject, OnDestroy, ViewChild } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { Router } from '@angular/router';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { FormBuilder } from '@angular/forms';
+import { FormBuilder, FormGroup } from '@angular/forms';
 import { NotificationService } from '@core/http/notification.service';
 import { deepClone, isDefinedAndNotNull } from '@core/utils';
 import { Observable } from 'rxjs';
@@ -31,8 +31,7 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { MediaBreakpoints } from '@shared/models/constants';
 import { TranslateService } from '@ngx-translate/core';
 import { TemplateConfiguration } from '@home/pages/notification/template/template-configuration';
-import { AuthState } from '@core/auth/auth.models';
-import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import { getCurrentAuthUser } from '@core/auth/auth.selectors';
 import { AuthUser } from '@shared/models/user.model';
 import { Authority } from '@shared/models/authority.enum';
 
@@ -41,6 +40,7 @@ export interface TemplateNotificationDialogData {
   predefinedType?: NotificationType;
   isAdd?: boolean;
   isCopy?: boolean;
+  name?: string;
 }
 
 @Component({
@@ -54,7 +54,6 @@ export class TemplateNotificationDialogComponent
   @ViewChild('notificationTemplateStepper', {static: true}) notificationTemplateStepper: MatStepper;
 
   stepperOrientation: Observable<StepperOrientation>;
-  stepperLabelPosition: Observable<'bottom' | 'end'>;
 
   dialogTitle = 'notification.edit-notification-template';
 
@@ -63,9 +62,10 @@ export class TemplateNotificationDialogComponent
   selectedIndex = 0;
   hideSelectType = false;
 
+  notificationTemplateConfigurationForm: FormGroup;
+
   private readonly templateNotification: NotificationTemplate;
-  private authState: AuthState = getCurrentAuthState(this.store);
-  private authUser: AuthUser = this.authState.authUser;
+  private authUser: AuthUser = getCurrentAuthUser(this.store);
 
   constructor(protected store: Store<AppState>,
               protected router: Router,
@@ -82,12 +82,12 @@ export class TemplateNotificationDialogComponent
     this.stepperOrientation = this.breakpointObserver.observe(MediaBreakpoints['gt-sm'])
       .pipe(map(({matches}) => matches ? 'horizontal' : 'vertical'));
 
-    this.stepperLabelPosition = this.breakpointObserver.observe(MediaBreakpoints['gt-md'])
-      .pipe(map(({matches}) => matches ? 'end' : 'bottom'));
-
     if (isDefinedAndNotNull(this.data?.predefinedType)) {
       this.hideSelectType = true;
       this.templateNotificationForm.get('notificationType').setValue(this.data.predefinedType, {emitEvent: false});
+    }
+    if (isDefinedAndNotNull(this.data?.name)) {
+      this.templateNotificationForm.get('name').setValue(this.data.name, {emitEvent: false});
     }
 
     if (data.isAdd || data.isCopy) {
@@ -103,11 +103,10 @@ export class TemplateNotificationDialogComponent
       }
       this.templateNotificationForm.reset({}, {emitEvent: false});
       this.templateNotificationForm.patchValue(this.templateNotification, {emitEvent: false});
-      // eslint-disable-next-line guard-for-in
-      for (const method in this.templateNotification.configuration.deliveryMethodsTemplates) {
-        this.deliveryMethodFormsMap.get(NotificationDeliveryMethod[method])
-          .patchValue(this.templateNotification.configuration.deliveryMethodsTemplates[method]);
-      }
+      this.notificationTemplateConfigurationForm.patchValue({
+        deliveryMethodsTemplates: this.templateNotification.configuration.deliveryMethodsTemplates
+      }, {emitEvent: false});
+      this.deliveryConfiguration = this.templateNotificationForm.get('configuration.deliveryMethodsTemplates').value;
     }
   }
 
@@ -123,6 +122,9 @@ export class TemplateNotificationDialogComponent
 
   changeStep($event: StepperSelectionEvent) {
     this.selectedIndex = $event.selectedIndex;
+    if ($event.previouslySelectedIndex > $event.selectedIndex) {
+      $event.previouslySelectedStep.interacted = false;
+    }
   }
 
   backStep() {
@@ -179,8 +181,12 @@ export class TemplateNotificationDialogComponent
   private allowNotificationType(): NotificationType[] {
     const sysAdminAllowNotificationTypes = new Set([
       NotificationType.ENTITIES_LIMIT,
+      NotificationType.ENTITIES_LIMIT_INCREASE_REQUEST,
       NotificationType.API_USAGE_LIMIT,
       NotificationType.NEW_PLATFORM_VERSION,
+      NotificationType.RATE_LIMITS,
+      NotificationType.TASK_PROCESSING_FAILURE,
+      NotificationType.RESOURCES_SHORTAGE
     ]);
 
     if (this.isSysAdmin()) {

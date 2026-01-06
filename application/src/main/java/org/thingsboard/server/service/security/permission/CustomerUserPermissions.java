@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,18 @@ import org.springframework.stereotype.Component;
 import org.thingsboard.server.common.data.DashboardInfo;
 import org.thingsboard.server.common.data.HasCustomerId;
 import org.thingsboard.server.common.data.HasTenantId;
+import org.thingsboard.server.common.data.TbResourceInfo;
 import org.thingsboard.server.common.data.User;
+import org.thingsboard.server.common.data.id.ApiKeyId;
 import org.thingsboard.server.common.data.id.DashboardId;
 import org.thingsboard.server.common.data.id.EntityId;
+import org.thingsboard.server.common.data.id.TbResourceId;
 import org.thingsboard.server.common.data.id.UserId;
+import org.thingsboard.server.common.data.pat.ApiKeyInfo;
 import org.thingsboard.server.common.data.security.Authority;
 import org.thingsboard.server.service.security.model.SecurityUser;
 
-@Component(value = "customerUserPermissions")
+@Component
 public class CustomerUserPermissions extends AbstractPermissions {
 
     public CustomerUserPermissions() {
@@ -44,6 +48,9 @@ public class CustomerUserPermissions extends AbstractPermissions {
         put(Resource.RPC, rpcPermissionChecker);
         put(Resource.DEVICE_PROFILE, profilePermissionChecker);
         put(Resource.ASSET_PROFILE, profilePermissionChecker);
+        put(Resource.TB_RESOURCE, customerResourcePermissionChecker);
+        put(Resource.MOBILE_APP_SETTINGS, new PermissionChecker.GenericPermissionChecker(Operation.READ));
+        put(Resource.API_KEY, apiKeysPermissionChecker);
     }
 
     private static final PermissionChecker customerAlarmPermissionChecker = new PermissionChecker() {
@@ -91,6 +98,26 @@ public class CustomerUserPermissions extends AbstractPermissions {
                         return false;
                     }
                     return user.getCustomerId().equals(entityId);
+                }
+
+            };
+
+    private static final PermissionChecker customerResourcePermissionChecker =
+            new PermissionChecker<TbResourceId, TbResourceInfo>() {
+
+                @Override
+                @SuppressWarnings("unchecked")
+                public boolean hasPermission(SecurityUser user, Operation operation, TbResourceId resourceId, TbResourceInfo resource) {
+                    if (operation != Operation.READ) {
+                        return false;
+                    }
+                    if (resource.getResourceType() == null || !resource.getResourceType().isCustomerAccess()) {
+                        return false;
+                    }
+                    if (resource.getTenantId() == null || resource.getTenantId().isNullUid()) {
+                        return true;
+                    }
+                    return user.getTenantId().equals(resource.getTenantId());
                 }
 
             };
@@ -178,4 +205,19 @@ public class CustomerUserPermissions extends AbstractPermissions {
             return user.getTenantId().equals(entity.getTenantId());
         }
     };
+
+    private static final PermissionChecker apiKeysPermissionChecker = new PermissionChecker<ApiKeyId, ApiKeyInfo>() {
+
+        @Override
+        public boolean hasPermission(SecurityUser user, Operation operation) {
+            return true;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public boolean hasPermission(SecurityUser user, Operation operation, ApiKeyId entityId, ApiKeyInfo entity) {
+            return user.getTenantId().equals(entity.getTenantId());
+        }
+    };
+
 }

@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 import { NotificationId } from '@shared/models/id/notification-id';
 import { NotificationRequestId } from '@shared/models/id/notification-request-id';
 import { UserId } from '@shared/models/id/user-id';
-import { BaseData } from '@shared/models/base-data';
+import { BaseData, ExportableEntity } from '@shared/models/base-data';
 import { TenantId } from '@shared/models/id/tenant-id';
 import { NotificationTargetId } from '@shared/models/id/notification-target-id';
 import { NotificationTemplateId } from '@shared/models/id/notification-template-id';
@@ -25,8 +25,9 @@ import { EntityId } from '@shared/models/id/entity-id';
 import { NotificationRuleId } from '@shared/models/id/notification-rule-id';
 import { AlarmSearchStatus, AlarmSeverity, AlarmStatus } from '@shared/models/alarm.models';
 import { EntityType } from '@shared/models/entity-type.models';
-import { User } from '@shared/models/user.model';
 import { ApiFeature, ApiUsageStateValue } from '@shared/models/api-usage.models';
+import { LimitedApi } from '@shared/models/limited-api.models';
+import { HasTenantId } from '@shared/models/entity.models';
 
 export interface Notification {
   readonly id: NotificationId;
@@ -48,6 +49,8 @@ export interface NotificationInfo {
   alarmStatus?: AlarmStatus;
   alarmType?: string;
   stateEntityId?: EntityId;
+  acknowledged?: boolean;
+  cleared?: boolean;
 }
 
 export interface NotificationRequest extends Omit<BaseData<NotificationRequestId>, 'label'> {
@@ -78,7 +81,7 @@ export interface NotificationRequestPreview {
 export interface NotificationRequestStats {
   sent: Map<NotificationDeliveryMethod, any>;
   errors: { [key in NotificationDeliveryMethod]: {[errorKey in string]: string}};
-  processedRecipients: Map<NotificationDeliveryMethod, Set<UserId>>;
+  totalErrors: number;
 }
 
 export interface NotificationRequestConfig {
@@ -89,13 +92,19 @@ export interface NotificationSettings {
   deliveryMethodsConfigs: { [key in NotificationDeliveryMethod]: NotificationDeliveryMethodConfig };
 }
 
-export interface NotificationDeliveryMethodConfig extends Partial<SlackNotificationDeliveryMethodConfig>{
+export interface NotificationDeliveryMethodConfig extends Partial<SlackNotificationDeliveryMethodConfig &
+  MobileNotificationDeliveryMethodConfig>{
   enabled: boolean;
   method: NotificationDeliveryMethod;
 }
 
 interface SlackNotificationDeliveryMethodConfig {
   botToken: string;
+}
+
+interface MobileNotificationDeliveryMethodConfig {
+  firebaseServiceAccountCredentials: string;
+  firebaseServiceAccountCredentialsFileName: string;
 }
 
 export interface SlackConversation {
@@ -107,19 +116,20 @@ export interface SlackConversation {
   type: string;
 }
 
-export interface NotificationRule extends Omit<BaseData<NotificationRuleId>, 'label'>{
+export interface NotificationRule extends Omit<BaseData<NotificationRuleId>, 'label'>, HasTenantId, ExportableEntity<NotificationRuleId> {
   tenantId: TenantId;
+  enabled: boolean;
   templateId: NotificationTemplateId;
   triggerType: TriggerType;
   triggerConfig: NotificationRuleTriggerConfig;
   recipientsConfig: NotificationRuleRecipientConfig;
-  additionalConfig: {description: string};
+  additionalConfig?: {description: string};
 }
 
 export type NotificationRuleTriggerConfig = Partial<AlarmNotificationRuleTriggerConfig & DeviceInactivityNotificationRuleTriggerConfig &
   EntityActionNotificationRuleTriggerConfig & AlarmCommentNotificationRuleTriggerConfig & AlarmAssignmentNotificationRuleTriggerConfig &
   RuleEngineLifecycleEventNotificationRuleTriggerConfig & EntitiesLimitNotificationRuleTriggerConfig &
-  ApiUsageLimitNotificationRuleTriggerConfig>;
+  ApiUsageLimitNotificationRuleTriggerConfig & RateLimitsNotificationRuleTriggerConfig & ResourceUsageShortageNotificationRuleTriggerConfig>;
 
 export interface AlarmNotificationRuleTriggerConfig {
   alarmTypes?: Array<string>;
@@ -173,9 +183,19 @@ export interface EntitiesLimitNotificationRuleTriggerConfig {
   threshold: number;
 }
 
+export interface ResourceUsageShortageNotificationRuleTriggerConfig {
+  cpuThreshold: number;
+  ramThreshold: number;
+  storageThreshold: number;
+}
+
 export interface ApiUsageLimitNotificationRuleTriggerConfig {
   apiFeatures: ApiFeature[];
   notifyOn: ApiUsageStateValue[];
+}
+
+export interface RateLimitsNotificationRuleTriggerConfig {
+  apis: LimitedApi[];
 }
 
 export enum ComponentLifecycleEvent {
@@ -234,12 +254,15 @@ export interface NonConfirmedNotificationEscalation {
   targets: Array<string>;
 }
 
-export interface NotificationTarget extends Omit<BaseData<NotificationTargetId>, 'label'>{
+export interface NotificationTarget extends Omit<BaseData<NotificationTargetId>, 'label'>, HasTenantId,
+  ExportableEntity<NotificationTargetId> {
   tenantId: TenantId;
   configuration: NotificationTargetConfig;
 }
 
-export interface NotificationTargetConfig extends Partial<PlatformUsersNotificationTargetConfig & SlackNotificationTargetConfig> {
+export interface NotificationTargetConfig extends Partial<PlatformUsersNotificationTargetConfig
+  & SlackNotificationTargetConfig
+  & MicrosoftTeamsNotificationTargetConfig> {
   description?: string;
   type: NotificationTargetType;
 }
@@ -269,37 +292,52 @@ export interface SlackNotificationTargetConfig {
   conversationType: SlackChanelType;
   conversation: SlackConversation;
 }
+
+export interface MicrosoftTeamsNotificationTargetConfig {
+  webhookUrl: string;
+  channelName: string;
+  useOldApi?: boolean;
+}
 export enum NotificationTargetType {
   PLATFORM_USERS = 'PLATFORM_USERS',
-  SLACK = 'SLACK'
+  SLACK = 'SLACK',
+  MICROSOFT_TEAMS = 'MICROSOFT_TEAMS'
 }
 
 export const NotificationTargetTypeTranslationMap = new Map<NotificationTargetType, string>([
   [NotificationTargetType.PLATFORM_USERS, 'notification.platform-users'],
-  [NotificationTargetType.SLACK, 'notification.delivery-method.slack']
+  [NotificationTargetType.SLACK, 'notification.delivery-method.slack'],
+  [NotificationTargetType.MICROSOFT_TEAMS, 'notification.delivery-method.microsoft-teams'],
 ]);
 
-export interface NotificationTemplate extends Omit<BaseData<NotificationTemplateId>, 'label'>{
+export interface NotificationTemplate extends Omit<BaseData<NotificationTemplateId>, 'label'>,
+  HasTenantId, ExportableEntity<NotificationTemplateId> {
   tenantId: TenantId;
   notificationType: NotificationType;
   configuration: NotificationTemplateConfig;
 }
 
 interface NotificationTemplateConfig {
-  deliveryMethodsTemplates: {
-    [key in NotificationDeliveryMethod]: DeliveryMethodNotificationTemplate
-  };
+  deliveryMethodsTemplates: DeliveryMethodsTemplates;
+}
+
+export type DeliveryMethodsTemplates = {
+  [key in NotificationDeliveryMethod]: DeliveryMethodNotificationTemplate
 }
 
 export interface DeliveryMethodNotificationTemplate extends
-  Partial<WebDeliveryMethodNotificationTemplate & EmailDeliveryMethodNotificationTemplate & SlackDeliveryMethodNotificationTemplate>{
-  body?: string;
+  Partial<WebDeliveryMethodNotificationTemplate
+    & EmailDeliveryMethodNotificationTemplate
+    & SlackDeliveryMethodNotificationTemplate
+    & MicrosoftTeamsDeliveryMethodNotificationTemplate
+    & MobileDeliveryMethodNotificationTemplate>{
+  body: string;
   enabled: boolean;
   method: NotificationDeliveryMethod;
 }
 
 interface WebDeliveryMethodNotificationTemplate {
-  subject?: string;
+  subject: string;
   additionalConfig: WebDeliveryMethodAdditionalConfig;
 }
 
@@ -309,15 +347,17 @@ interface WebDeliveryMethodAdditionalConfig {
     icon: string;
     color: string;
   };
-  actionButtonConfig: {
-    enabled: boolean;
-    text: string;
-    linkType: ActionButtonLinkType;
-    link?: string;
-    dashboardId?: string;
-    dashboardState?: string;
-    setEntityIdInState?: boolean;
-  };
+  actionButtonConfig: NotificationButtonConfig;
+}
+
+interface NotificationButtonConfig {
+  enabled: boolean;
+  text: string;
+  linkType: ActionButtonLinkType;
+  link?: string;
+  dashboardId?: string;
+  dashboardState?: string;
+  setEntityIdInState?: boolean;
 }
 
 interface EmailDeliveryMethodNotificationTemplate {
@@ -329,6 +369,16 @@ interface SlackDeliveryMethodNotificationTemplate {
   conversationId: string;
 }
 
+interface MicrosoftTeamsDeliveryMethodNotificationTemplate {
+  subject?: string;
+  button: NotificationButtonConfig;
+  themeColor?: string;
+}
+
+interface MobileDeliveryMethodNotificationTemplate {
+  subject: string;
+}
+
 export enum NotificationStatus {
   SENT = 'SENT',
   READ = 'READ'
@@ -336,16 +386,52 @@ export enum NotificationStatus {
 
 export enum NotificationDeliveryMethod {
   WEB = 'WEB',
+  MOBILE_APP = 'MOBILE_APP',
   SMS = 'SMS',
   EMAIL = 'EMAIL',
-  SLACK = 'SLACK'
+  SLACK = 'SLACK',
+  MICROSOFT_TEAMS = 'MICROSOFT_TEAMS'
 }
 
-export const NotificationDeliveryMethodTranslateMap = new Map<NotificationDeliveryMethod, string>([
-  [NotificationDeliveryMethod.WEB, 'notification.delivery-method.web'],
-  [NotificationDeliveryMethod.SMS, 'notification.delivery-method.sms'],
-  [NotificationDeliveryMethod.EMAIL, 'notification.delivery-method.email'],
-  [NotificationDeliveryMethod.SLACK, 'notification.delivery-method.slack']
+export interface NotificationDeliveryMethodInfo {
+  name: string;
+  icon: string;
+}
+
+export const NotificationDeliveryMethodInfoMap = new Map<NotificationDeliveryMethod, NotificationDeliveryMethodInfo>([
+  [NotificationDeliveryMethod.WEB,
+    {
+      name: 'notification.delivery-method.web',
+      icon: 'mdi:bell-badge'
+    }
+  ],
+  [NotificationDeliveryMethod.SMS,
+    {
+      name: 'notification.delivery-method.sms',
+      icon: 'mdi:message-processing'
+    }
+  ],
+  [NotificationDeliveryMethod.EMAIL,
+    {
+      name: 'notification.delivery-method.email',
+      icon: 'mdi:email'
+    }],
+  [NotificationDeliveryMethod.SLACK,
+    {
+      name: 'notification.delivery-method.slack',
+      icon: 'mdi:slack'
+    }
+  ],
+  [NotificationDeliveryMethod.MOBILE_APP,
+    {
+      name: 'notification.delivery-method.mobile-app',
+      icon: 'mdi:cellphone-text'
+    }],
+  [NotificationDeliveryMethod.MICROSOFT_TEAMS,
+    {
+      name: 'notification.delivery-method.microsoft-teams',
+      icon: 'mdi:microsoft-teams'
+    }]
 ]);
 
 export enum NotificationRequestStatus {
@@ -411,14 +497,12 @@ export const NotificationTargetConfigTypeInfoMap = new Map<NotificationTargetCon
   ],
   [NotificationTargetConfigType.ORIGINATOR_ENTITY_OWNER_USERS,
     {
-      name: 'notification.recipient-type.users-entity-owner',
-      hint: 'notification.recipient-type.users-entity-owner-hint'
+      name: 'notification.recipient-type.users-entity-owner'
     }
   ],
   [NotificationTargetConfigType.AFFECTED_USER,
     {
-      name: 'notification.recipient-type.affected-user',
-      hint: 'notification.recipient-type.affected-user-hint'
+      name: 'notification.recipient-type.affected-user'
     }
   ],
   [NotificationTargetConfigType.SYSTEM_ADMINISTRATORS,
@@ -442,9 +526,15 @@ export enum NotificationType {
   ALARM_ASSIGNMENT = 'ALARM_ASSIGNMENT',
   RULE_ENGINE_COMPONENT_LIFECYCLE_EVENT = 'RULE_ENGINE_COMPONENT_LIFECYCLE_EVENT',
   ENTITIES_LIMIT = 'ENTITIES_LIMIT',
+  ENTITIES_LIMIT_INCREASE_REQUEST = 'ENTITIES_LIMIT_INCREASE_REQUEST',
   API_USAGE_LIMIT = 'API_USAGE_LIMIT',
   NEW_PLATFORM_VERSION = 'NEW_PLATFORM_VERSION',
-  RULE_NODE = 'RULE_NODE'
+  RULE_NODE = 'RULE_NODE',
+  RATE_LIMITS = 'RATE_LIMITS',
+  EDGE_CONNECTION = 'EDGE_CONNECTION',
+  EDGE_COMMUNICATION_FAILURE = 'EDGE_COMMUNICATION_FAILURE',
+  TASK_PROCESSING_FAILURE = 'TASK_PROCESSING_FAILURE',
+  RESOURCES_SHORTAGE = 'RESOURCES_SHORTAGE'
 }
 
 export const NotificationTypeIcons = new Map<NotificationType, string | null>([
@@ -455,18 +545,11 @@ export const NotificationTypeIcons = new Map<NotificationType, string | null>([
   [NotificationType.ALARM_ASSIGNMENT, 'assignment_turned_in'],
   [NotificationType.RULE_ENGINE_COMPONENT_LIFECYCLE_EVENT, 'settings_ethernet'],
   [NotificationType.ENTITIES_LIMIT, 'data_thresholding'],
+  [NotificationType.ENTITIES_LIMIT_INCREASE_REQUEST, 'mdi:file-cog'],
   [NotificationType.API_USAGE_LIMIT, 'insert_chart'],
+  [NotificationType.TASK_PROCESSING_FAILURE, 'warning'],
+  [NotificationType.RESOURCES_SHORTAGE, 'warning']
 ]);
-
-export const AlarmSeverityNotificationColors = new Map<AlarmSeverity, string>(
-  [
-    [AlarmSeverity.CRITICAL, '#D12730'],
-    [AlarmSeverity.MAJOR, '#FEAC0C'],
-    [AlarmSeverity.MINOR, '#F2DA05'],
-    [AlarmSeverity.WARNING, '#F66716'],
-    [AlarmSeverity.INDETERMINATE, '#00000061']
-  ]
-);
 
 export enum ActionButtonLinkType {
   LINK = 'LINK',
@@ -532,6 +615,12 @@ export const NotificationTemplateTypeTranslateMap = new Map<NotificationType, No
       helpId: 'notification/entities_limit'
     }
   ],
+  [NotificationType.ENTITIES_LIMIT_INCREASE_REQUEST,
+    {
+      name: 'notification.template-type.entities-limit-increase-request',
+      helpId: 'notification/entities_limit_increase_request'
+    }
+  ],
   [NotificationType.API_USAGE_LIMIT,
     {
       name: 'notification.template-type.api-usage-limit',
@@ -549,6 +638,36 @@ export const NotificationTemplateTypeTranslateMap = new Map<NotificationType, No
       name: 'notification.template-type.rule-node',
       helpId: 'notification/rule_node'
     }
+  ],
+  [NotificationType.RATE_LIMITS,
+    {
+      name: 'notification.template-type.rate-limits',
+      helpId: 'notification/rate_limits'
+    }
+  ],
+  [NotificationType.EDGE_CONNECTION,
+    {
+      name: 'notification.template-type.edge-connection',
+      helpId: 'notification/edge_connection'
+    }
+  ],
+  [NotificationType.EDGE_COMMUNICATION_FAILURE,
+    {
+      name: 'notification.template-type.edge-communication-failure',
+      helpId: 'notification/edge_communication_failure'
+    }
+  ],
+  [NotificationType.TASK_PROCESSING_FAILURE,
+    {
+      name: 'notification.template-type.task-processing-failure',
+      helpId: 'notification/task_processing_failure'
+    }
+  ],
+  [NotificationType.RESOURCES_SHORTAGE,
+    {
+      name: 'notification.template-type.resources-shortage',
+      helpId: 'notification/resources_shortage'
+    }
   ]
 ]);
 
@@ -561,7 +680,12 @@ export enum TriggerType {
   RULE_ENGINE_COMPONENT_LIFECYCLE_EVENT = 'RULE_ENGINE_COMPONENT_LIFECYCLE_EVENT',
   ENTITIES_LIMIT = 'ENTITIES_LIMIT',
   API_USAGE_LIMIT = 'API_USAGE_LIMIT',
-  NEW_PLATFORM_VERSION = 'NEW_PLATFORM_VERSION'
+  NEW_PLATFORM_VERSION = 'NEW_PLATFORM_VERSION',
+  RATE_LIMITS = 'RATE_LIMITS',
+  EDGE_CONNECTION = 'EDGE_CONNECTION',
+  EDGE_COMMUNICATION_FAILURE = 'EDGE_COMMUNICATION_FAILURE',
+  TASK_PROCESSING_FAILURE = 'TASK_PROCESSING_FAILURE',
+  RESOURCES_SHORTAGE = 'RESOURCES_SHORTAGE'
 }
 
 export const TriggerTypeTranslationMap = new Map<TriggerType, string>([
@@ -574,4 +698,18 @@ export const TriggerTypeTranslationMap = new Map<TriggerType, string>([
   [TriggerType.ENTITIES_LIMIT, 'notification.trigger.entities-limit'],
   [TriggerType.API_USAGE_LIMIT, 'notification.trigger.api-usage-limit'],
   [TriggerType.NEW_PLATFORM_VERSION, 'notification.trigger.new-platform-version'],
+  [TriggerType.RATE_LIMITS, 'notification.trigger.rate-limits'],
+  [TriggerType.EDGE_CONNECTION, 'notification.trigger.edge-connection'],
+  [TriggerType.EDGE_COMMUNICATION_FAILURE, 'notification.trigger.edge-communication-failure'],
+  [TriggerType.TASK_PROCESSING_FAILURE, 'notification.trigger.task-processing-failure'],
+  [TriggerType.RESOURCES_SHORTAGE, 'notification.trigger.resources-shortage']
 ]);
+
+export interface NotificationUserSettings {
+  prefs: {[key: string]: NotificationUserSetting};
+}
+
+export interface NotificationUserSetting {
+  enabled: boolean;
+  enabledDeliveryMethods: {[key: string]: boolean};
+}

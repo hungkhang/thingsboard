@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 /// limitations under the License.
 ///
 
-import { Injectable, NgModule } from '@angular/core';
-import { Resolve, RouterModule, Routes } from '@angular/router';
+import { inject, NgModule } from '@angular/core';
+import { ActivatedRouteSnapshot, ResolveFn, RouterModule, RouterStateSnapshot, Routes } from '@angular/router';
 
 import { HomeLinksComponent } from './home-links.component';
 import { Authority } from '@shared/models/authority.enum';
@@ -27,67 +27,96 @@ import { AppState } from '@core/core.state';
 import { map } from 'rxjs/operators';
 import {
   getCurrentAuthUser,
-  selectHasRepository,
+  selectHomeDashboardParams,
+  selectMobileQrEnabled,
   selectPersistDeviceStateToTelemetry
 } from '@core/auth/auth.selectors';
-import sysAdminHomePageDashboardJson from '!raw-loader!./sys_admin_home_page.raw';
-import tenantAdminHomePageDashboardJson from '!raw-loader!./tenant_admin_home_page.raw';
-import customerUserHomePageDashboardJson from '!raw-loader!./customer_user_home_page.raw';
 import { EntityKeyType } from '@shared/models/query/query.models';
+import { ResourcesService } from '@core/services/resources.service';
+import { isDefinedAndNotNull } from '@core/utils';
+import { MenuId } from '@core/services/menu.models';
 
-@Injectable()
-export class HomeDashboardResolver implements Resolve<HomeDashboard> {
+const sysAdminHomePageJson = '/assets/dashboard/sys_admin_home_page.json';
+const tenantAdminHomePageJson = '/assets/dashboard/tenant_admin_home_page.json';
+const customerUserHomePageJson = '/assets/dashboard/customer_user_home_page.json';
 
-  constructor(private dashboardService: DashboardService,
-              private store: Store<AppState>) {
+const getHomeDashboard = (store: Store<AppState>, resourcesService: ResourcesService) => {
+  const authority = getCurrentAuthUser(store).authority;
+  switch (authority) {
+    case Authority.SYS_ADMIN:
+      return applySystemParametersToHomeDashboard(store, resourcesService.loadJsonResource(sysAdminHomePageJson), authority);
+    case Authority.TENANT_ADMIN:
+      return applySystemParametersToHomeDashboard(store, resourcesService.loadJsonResource(tenantAdminHomePageJson), authority);
+    case Authority.CUSTOMER_USER:
+      return applySystemParametersToHomeDashboard(store, resourcesService.loadJsonResource(customerUserHomePageJson), authority);
+    default:
+      return of(null);
   }
+};
 
-  resolve(): Observable<HomeDashboard> {
-    return this.dashboardService.getHomeDashboard().pipe(
-      mergeMap((dashboard) => {
-        if (!dashboard) {
-          let dashboard$: Observable<HomeDashboard>;
-          const authority = getCurrentAuthUser(this.store).authority;
-          switch (authority) {
-            case Authority.SYS_ADMIN:
-              dashboard$ = of(JSON.parse(sysAdminHomePageDashboardJson));
-              break;
-            case Authority.TENANT_ADMIN:
-              dashboard$ = this.updateDeviceActivityKeyFilterIfNeeded(JSON.parse(tenantAdminHomePageDashboardJson));
-              break;
-            case Authority.CUSTOMER_USER:
-              dashboard$ = this.updateDeviceActivityKeyFilterIfNeeded(JSON.parse(customerUserHomePageDashboardJson));
-              break;
-          }
-          if (dashboard$) {
-            return dashboard$.pipe(
-              map((homeDashboard) => {
-                homeDashboard.hideDashboardToolbar = true;
-                return homeDashboard;
-              })
-            );
-          }
-        }
-        return of(dashboard);
-      })
-    );
+const applySystemParametersToHomeDashboard = (store: Store<AppState>,
+                                              dashboard$: Observable<HomeDashboard>,
+                                              authority: Authority): Observable<HomeDashboard> => {
+  let selectParams$: Observable<{persistDeviceStateToTelemetry?: boolean, mobileQrEnabled?: boolean}>;
+  switch (authority) {
+    case Authority.SYS_ADMIN:
+      selectParams$ = store.pipe(
+        select(selectMobileQrEnabled),
+        map(mobileQrEnabled => ({mobileQrEnabled}))
+      );
+      break;
+    case Authority.TENANT_ADMIN:
+      selectParams$ = store.pipe(select(selectHomeDashboardParams));
+      break;
+    case Authority.CUSTOMER_USER:
+      selectParams$ = store.pipe(
+        select(selectPersistDeviceStateToTelemetry),
+        map(persistDeviceStateToTelemetry => ({persistDeviceStateToTelemetry}))
+      );
+      break;
   }
-
-  private updateDeviceActivityKeyFilterIfNeeded(dashboard: HomeDashboard): Observable<HomeDashboard> {
-    return this.store.pipe(select(selectPersistDeviceStateToTelemetry)).pipe(
-      map((persistToTelemetry) => {
-        if (persistToTelemetry) {
+  return selectParams$.pipe(
+    mergeMap((params) => dashboard$.pipe(
+      map((dashboard) => {
+        if (params.persistDeviceStateToTelemetry) {
           for (const filterId of Object.keys(dashboard.configuration.filters)) {
             if (['Active Devices', 'Inactive Devices'].includes(dashboard.configuration.filters[filterId].filter)) {
               dashboard.configuration.filters[filterId].keyFilters[0].key.type = EntityKeyType.TIME_SERIES;
             }
           }
         }
+        if (isDefinedAndNotNull(params.mobileQrEnabled)) {
+          for (const widgetId of Object.keys(dashboard.configuration.widgets)) {
+            if (dashboard.configuration.widgets[widgetId].config.title === 'Select show mobile QR code') {
+              dashboard.configuration.widgets[widgetId].config.settings.markdownTextFunction =
+                (dashboard.configuration.widgets[widgetId].config.settings.markdownTextFunction as string)
+                  .replace(/\${mobileQrEnabled:([^}]+)}/, `\${mobileQrEnabled:${String(params.mobileQrEnabled)}}`);
+              break;
+            }
+          }
+        }
+        dashboard.hideDashboardToolbar = true;
         return dashboard;
       })
-    );
-  }
-}
+    ))
+  );
+};
+
+export const homeDashboardResolver: ResolveFn<HomeDashboard> = (
+  route: ActivatedRouteSnapshot,
+  state: RouterStateSnapshot,
+  dashboardService = inject(DashboardService),
+  resourcesService = inject(ResourcesService),
+  store: Store<AppState> = inject(Store<AppState>)
+): Observable<HomeDashboard> =>
+  dashboardService.getHomeDashboard().pipe(
+    mergeMap((dashboard) => {
+      if (!dashboard) {
+        return getHomeDashboard(store, resourcesService);
+      }
+      return of(dashboard);
+    })
+  );
 
 const routes: Routes = [
   {
@@ -97,21 +126,17 @@ const routes: Routes = [
       auth: [Authority.SYS_ADMIN, Authority.TENANT_ADMIN, Authority.CUSTOMER_USER],
       title: 'home.home',
       breadcrumb: {
-        label: 'home.home',
-        icon: 'home'
+        menuId: MenuId.home
       }
     },
     resolve: {
-      homeDashboard: HomeDashboardResolver
+      homeDashboard: homeDashboardResolver
     }
   }
 ];
 
 @NgModule({
   imports: [RouterModule.forChild(routes)],
-  exports: [RouterModule],
-  providers: [
-    HomeDashboardResolver
-  ]
+  exports: [RouterModule]
 })
 export class HomeLinksRoutingModule { }

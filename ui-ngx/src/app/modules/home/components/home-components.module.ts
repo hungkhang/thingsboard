@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import { DetailsPanelComponent } from '@home/components/details-panel.component'
 import { EntityDetailsPanelComponent } from '@home/components/entity/entity-details-panel.component';
 import { AuditLogDetailsDialogComponent } from '@home/components/audit-log/audit-log-details-dialog.component';
 import { AuditLogTableComponent } from '@home/components/audit-log/audit-log-table.component';
+import { AuditLogHeaderComponent } from '@home/components/audit-log/audit-log-header.component';
 import { EventTableHeaderComponent } from '@home/components/event/event-table-header.component';
 import { EventTableComponent } from '@home/components/event/event-table.component';
 import { EventFilterPanelComponent } from '@home/components/event/event-filter-panel.component';
@@ -36,7 +37,6 @@ import { EditAttributeValuePanelComponent } from '@home/components/attribute/edi
 import { DashboardComponent } from '@home/components/dashboard/dashboard.component';
 import { WidgetComponent } from '@home/components/widget/widget.component';
 import { WidgetComponentService } from '@home/components/widget/widget-component.service';
-import { LegendComponent } from '@home/components/widget/legend.component';
 import { AliasesEntitySelectPanelComponent } from '@home/components/alias/aliases-entity-select-panel.component';
 import { AliasesEntitySelectComponent } from '@home/components/alias/aliases-entity-select.component';
 import { WidgetConfigComponent } from '@home/components/widget/widget-config.component';
@@ -45,23 +45,11 @@ import { EntityFilterViewComponent } from '@home/components/entity/entity-filter
 import { EntityAliasDialogComponent } from '@home/components/alias/entity-alias-dialog.component';
 import { EntityFilterComponent } from '@home/components/entity/entity-filter.component';
 import { RelationFiltersComponent } from '@home/components/relation/relation-filters.component';
-import { EntityAliasSelectComponent } from '@home/components/alias/entity-alias-select.component';
-import { DataKeysComponent } from '@home/components/widget/data-keys.component';
-import { DataKeyConfigDialogComponent } from '@home/components/widget/data-key-config-dialog.component';
-import { DataKeyConfigComponent } from '@home/components/widget/data-key-config.component';
-import { LegendConfigComponent } from '@home/components/widget/legend-config.component';
 import { ManageWidgetActionsComponent } from '@home/components/widget/action/manage-widget-actions.component';
 import { WidgetActionDialogComponent } from '@home/components/widget/action/widget-action-dialog.component';
-import { CustomActionPrettyResourcesTabsComponent } from '@home/components/widget/action/custom-action-pretty-resources-tabs.component';
-import { CustomActionPrettyEditorComponent } from '@home/components/widget/action/custom-action-pretty-editor.component';
-import { MobileActionEditorComponent } from '@home/components/widget/action/mobile-action-editor.component';
 import { CustomDialogService } from '@home/components/widget/dialog/custom-dialog.service';
 import { CustomDialogContainerComponent } from '@home/components/widget/dialog/custom-dialog-container.component';
-import { ImportExportService } from '@home/components/import-export/import-export.service';
-import { ImportDialogComponent } from '@home/components/import-export/import-dialog.component';
 import { AddWidgetToDashboardDialogComponent } from '@home/components/attribute/add-widget-to-dashboard-dialog.component';
-import { ImportDialogCsvComponent } from '@home/components/import-export/import-dialog-csv.component';
-import { TableColumnsAssignmentComponent } from '@home/components/import-export/table-columns-assignment.component';
 import { EventContentDialogComponent } from '@home/components/event/event-content-dialog.component';
 import { SharedHomeComponentsModule } from '@home/components/shared-home-components.module';
 import { SelectTargetLayoutDialogComponent } from '@home/components/dashboard/select-target-layout-dialog.component';
@@ -78,7 +66,6 @@ import { ComplexFilterPredicateDialogComponent } from '@home/components/filter/c
 import { KeyFilterDialogComponent } from '@home/components/filter/key-filter-dialog.component';
 import { FiltersDialogComponent } from '@home/components/filter/filters-dialog.component';
 import { FilterDialogComponent } from '@home/components/filter/filter-dialog.component';
-import { FilterSelectComponent } from '@home/components/filter/filter-select.component';
 import { FiltersEditComponent } from '@home/components/filter/filters-edit.component';
 import { FiltersEditPanelComponent } from '@home/components/filter/filters-edit-panel.component';
 import { UserFilterDialogComponent } from '@home/components/filter/user-filter-dialog.component';
@@ -128,6 +115,9 @@ import { EditWidgetComponent } from '@home/components/dashboard-page/edit-widget
 import { DashboardWidgetSelectComponent } from '@home/components/dashboard-page/dashboard-widget-select.component';
 import { AddWidgetDialogComponent } from '@home/components/dashboard-page/add-widget-dialog.component';
 import { ManageDashboardLayoutsDialogComponent } from '@home/components/dashboard-page/layout/manage-dashboard-layouts-dialog.component';
+import {
+  AddNewBreakpointDialogComponent
+} from '@home/components/dashboard-page/layout/add-new-breakpoint-dialog.component';
 import { DashboardSettingsDialogComponent } from '@home/components/dashboard-page/dashboard-settings-dialog.component';
 import { ManageDashboardStatesDialogComponent } from '@home/components/dashboard-page/states/manage-dashboard-states-dialog.component';
 import { DashboardStateDialogComponent } from '@home/components/dashboard-page/states/dashboard-state-dialog.component';
@@ -138,7 +128,10 @@ import { EdgeDownlinkTableHeaderComponent } from '@home/components/edge/edge-dow
 import { DisplayWidgetTypesPanelComponent } from '@home/components/dashboard-page/widget-types-panel.component';
 import { AlarmDurationPredicateValueComponent } from '@home/components/profile/alarm/alarm-duration-predicate-value.component';
 import { DashboardImageDialogComponent } from '@home/components/dashboard-page/dashboard-image-dialog.component';
-import { WidgetContainerComponent } from '@home/components/widget/widget-container.component';
+import {
+  EditWidgetActionsTooltipComponent,
+  WidgetContainerComponent
+} from '@home/components/widget/widget-container.component';
 import { SnmpDeviceProfileTransportModule } from '@home/components/profile/device/snmp/snmp-device-profile-transport.module';
 import { DeviceCredentialsModule } from '@home/components/device/device-credentials.module';
 import { DeviceProfileCommonModule } from '@home/components/profile/device/common/device-profile-common.module';
@@ -152,8 +145,6 @@ import { AlarmDynamicValue } from '@home/components/profile/alarm/alarm-dynamic-
 import { EntityDetailsPageComponent } from '@home/components/entity/entity-details-page.component';
 import { TenantProfileQueuesComponent } from '@home/components/profile/queue/tenant-profile-queues.component';
 import { QueueFormComponent } from '@home/components/queue/queue-form.component';
-import { WidgetSettingsModule } from '@home/components/widget/lib/settings/widget-settings.module';
-import { WidgetSettingsComponent } from '@home/components/widget/widget-settings.component';
 import { RepositorySettingsComponent } from '@home/components/vc/repository-settings.component';
 import { VersionControlComponent } from '@home/components/vc/version-control.component';
 import { EntityVersionsTableComponent } from '@home/components/vc/entity-versions-table.component';
@@ -178,10 +169,39 @@ import { modulesMap } from '@modules/common/modules-map';
 import { AlarmAssigneePanelComponent } from '@home/components/alarm/alarm-assignee-panel.component';
 import { RouterTabsComponent } from '@home/components/router-tabs.component';
 import { SendNotificationButtonComponent } from '@home/components/notification/send-notification-button.component';
-import { AlarmFilterConfigComponent } from '@home/components/alarm/alarm-filter-config.component';
 import { AlarmAssigneeSelectPanelComponent } from '@home/components/alarm/alarm-assignee-select-panel.component';
-import { AlarmAssigneeSelectComponent } from '@home/components/alarm/alarm-assignee-select.component';
 import { DeviceInfoFilterComponent } from '@home/components/device/device-info-filter.component';
+import { WidgetPreviewComponent } from '@home/components/widget/widget-preview.component';
+import {
+  ManageWidgetActionsDialogComponent
+} from '@home/components/widget/action/manage-widget-actions-dialog.component';
+import { WidgetConfigComponentsModule } from '@home/components/widget/config/widget-config-components.module';
+import { BasicWidgetConfigModule } from '@home/components/widget/config/basic/basic-widget-config.module';
+import { DeleteTimeseriesPanelComponent } from '@home/components/attribute/delete-timeseries-panel.component';
+import { MoveWidgetsDialogComponent } from '@home/components/dashboard-page/layout/move-widgets-dialog.component';
+import {
+  SelectDashboardBreakpointComponent
+} from '@home/components/dashboard-page/layout/select-dashboard-breakpoint.component';
+import { EntityChipsComponent } from '@home/components/entity/entity-chips.component';
+import { DashboardViewComponent } from '@home/components/dashboard-view/dashboard-view.component';
+import {
+  EntityDebugSettingsButtonComponent
+} from '@home/components/entity/debug/entity-debug-settings-button.component';
+import { CheckConnectivityDialogComponent } from '@home/components/ai-model/check-connectivity-dialog.component';
+import { AIModelDialogComponent } from '@home/components/ai-model/ai-model-dialog.component';
+import { ResourcesDialogComponent } from "@home/components/resources/resources-dialog.component";
+import { ResourcesLibraryComponent } from "@home/components/resources/resources-library.component";
+import { CalculatedFieldsTableComponent } from '@home/components/calculated-fields/calculated-fields-table.component';
+import { CalculatedFieldsModule } from '@home/components/calculated-fields/calculated-field.module';
+import { AlarmRuleModule } from "@home/components/alarm-rules/alarm-rule.module";
+import { AlarmRulesTableComponent } from "@home/components/alarm-rules/alarm-rules-table.component";
+import { ApiKeysTableComponent } from '@home/components/api-key/api-keys-table.component';
+import { AddApiKeyDialogComponent } from '@home/components/api-key/add-api-key-dialog.component';
+import { EditApiKeyDescriptionPanelComponent } from '@home/components/api-key/edit-api-key-description-panel.component';
+import { ApiKeyGeneratedDialogComponent } from '@home/components/api-key/api-key-generated-dialog.component';
+import { ApiKeysTableDialogComponent } from '@home/components/api-key/api-keys-table-dialog.component';
+import { AuditLogFilterComponent } from "@home/components/audit-log/audit-log-filter.component";
+import { EventsDialogComponent } from '@home/dialogs/events-dialog.component';
 
 @NgModule({
   declarations:
@@ -194,6 +214,8 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
       EntityDetailsPageComponent,
       AuditLogTableComponent,
       AuditLogDetailsDialogComponent,
+      CalculatedFieldsTableComponent,
+      AlarmRulesTableComponent,
       EventContentDialogComponent,
       EventTableHeaderComponent,
       EventTableComponent,
@@ -206,12 +228,11 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
       AlarmTableHeaderComponent,
       AlarmTableComponent,
       AlarmAssigneePanelComponent,
-      AlarmAssigneeSelectComponent,
       AlarmAssigneeSelectPanelComponent,
-      AlarmFilterConfigComponent,
       AttributeTableComponent,
       AddAttributeDialogComponent,
       EditAttributeValuePanelComponent,
+      DeleteTimeseriesPanelComponent,
       AliasesEntitySelectPanelComponent,
       AliasesEntitySelectComponent,
       AliasesEntityAutocompleteComponent,
@@ -219,29 +240,19 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
       EntityAliasDialogComponent,
       DashboardComponent,
       WidgetContainerComponent,
+      EditWidgetActionsTooltipComponent,
       WidgetComponent,
-      LegendComponent,
-      WidgetSettingsComponent,
       WidgetConfigComponent,
+      WidgetPreviewComponent,
       EntityFilterViewComponent,
       EntityFilterComponent,
-      EntityAliasSelectComponent,
-      DataKeysComponent,
-      DataKeyConfigComponent,
-      DataKeyConfigDialogComponent,
-      LegendConfigComponent,
       ManageWidgetActionsComponent,
       WidgetActionDialogComponent,
-      CustomActionPrettyResourcesTabsComponent,
-      CustomActionPrettyEditorComponent,
-      MobileActionEditorComponent,
+      ManageWidgetActionsDialogComponent,
       CustomDialogContainerComponent,
-      ImportDialogComponent,
-      ImportDialogCsvComponent,
       SelectTargetLayoutDialogComponent,
       SelectTargetStateDialogComponent,
       AddWidgetToDashboardDialogComponent,
-      TableColumnsAssignmentComponent,
       BooleanFilterPredicateComponent,
       StringFilterPredicateComponent,
       NumericFilterPredicateComponent,
@@ -253,7 +264,6 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
       KeyFilterDialogComponent,
       FilterDialogComponent,
       FiltersDialogComponent,
-      FilterSelectComponent,
       FilterTextComponent,
       FiltersEditComponent,
       FiltersEditPanelComponent,
@@ -304,10 +314,13 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
       DashboardPageComponent,
       DashboardStateComponent,
       DashboardLayoutComponent,
+      SelectDashboardBreakpointComponent,
       EditWidgetComponent,
       DashboardWidgetSelectComponent,
       AddWidgetDialogComponent,
+      MoveWidgetsDialogComponent,
       ManageDashboardLayoutsDialogComponent,
+      AddNewBreakpointDialogComponent,
       DashboardSettingsDialogComponent,
       ManageDashboardStatesDialogComponent,
       DashboardStateDialogComponent,
@@ -332,18 +345,36 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
       RateLimitsComponent,
       RateLimitsTextComponent,
       RateLimitsDetailsDialogComponent,
-      SendNotificationButtonComponent
+      SendNotificationButtonComponent,
+      EntityChipsComponent,
+      DashboardViewComponent,
+      CheckConnectivityDialogComponent,
+      AIModelDialogComponent,
+      ResourcesDialogComponent,
+      ResourcesLibraryComponent,
+      ApiKeysTableComponent,
+      ApiKeysTableDialogComponent,
+      AddApiKeyDialogComponent,
+      EditApiKeyDescriptionPanelComponent,
+      ApiKeyGeneratedDialogComponent,
+      AuditLogHeaderComponent,
+      AuditLogFilterComponent,
+      EventsDialogComponent
     ],
   imports: [
     CommonModule,
     SharedModule,
     SharedHomeComponentsModule,
-    WidgetSettingsModule,
+    CalculatedFieldsModule,
+    AlarmRuleModule,
+    WidgetConfigComponentsModule,
+    BasicWidgetConfigModule,
     Lwm2mProfileComponentsModule,
     SnmpDeviceProfileTransportModule,
     StatesControllerModule,
     DeviceCredentialsModule,
-    DeviceProfileCommonModule
+    DeviceProfileCommonModule,
+    EntityDebugSettingsButtonComponent
   ],
   exports: [
     RouterTabsComponent,
@@ -353,6 +384,8 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
     EntityDetailsPanelComponent,
     EntityDetailsPageComponent,
     AuditLogTableComponent,
+    CalculatedFieldsTableComponent,
+    AlarmRulesTableComponent,
     EventTableComponent,
     EdgeDownlinkTableHeaderComponent,
     EdgeDownlinkTableComponent,
@@ -360,9 +393,7 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
     RelationFiltersComponent,
     AlarmTableComponent,
     AlarmAssigneePanelComponent,
-    AlarmAssigneeSelectComponent,
     AlarmAssigneeSelectPanelComponent,
-    AlarmFilterConfigComponent,
     AttributeTableComponent,
     AliasesEntitySelectComponent,
     AliasesEntityAutocompleteComponent,
@@ -370,26 +401,16 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
     EntityAliasDialogComponent,
     DashboardComponent,
     WidgetContainerComponent,
+    EditWidgetActionsTooltipComponent,
     WidgetComponent,
-    LegendComponent,
-    WidgetSettingsComponent,
     WidgetConfigComponent,
+    WidgetPreviewComponent,
     EntityFilterViewComponent,
     EntityFilterComponent,
-    EntityAliasSelectComponent,
-    DataKeysComponent,
-    DataKeyConfigComponent,
-    DataKeyConfigDialogComponent,
-    LegendConfigComponent,
     ManageWidgetActionsComponent,
     WidgetActionDialogComponent,
-    CustomActionPrettyResourcesTabsComponent,
-    CustomActionPrettyEditorComponent,
-    MobileActionEditorComponent,
+    ManageWidgetActionsDialogComponent,
     CustomDialogContainerComponent,
-    ImportDialogComponent,
-    ImportDialogCsvComponent,
-    TableColumnsAssignmentComponent,
     SelectTargetLayoutDialogComponent,
     SelectTargetStateDialogComponent,
     BooleanFilterPredicateComponent,
@@ -403,7 +424,6 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
     KeyFilterDialogComponent,
     FilterDialogComponent,
     FiltersDialogComponent,
-    FilterSelectComponent,
     FilterTextComponent,
     FiltersEditComponent,
     UserFilterDialogComponent,
@@ -448,10 +468,13 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
     DashboardPageComponent,
     DashboardStateComponent,
     DashboardLayoutComponent,
+    SelectDashboardBreakpointComponent,
     EditWidgetComponent,
     DashboardWidgetSelectComponent,
     AddWidgetDialogComponent,
+    MoveWidgetsDialogComponent,
     ManageDashboardLayoutsDialogComponent,
+    AddNewBreakpointDialogComponent,
     DashboardSettingsDialogComponent,
     ManageDashboardStatesDialogComponent,
     DashboardStateDialogComponent,
@@ -476,12 +499,20 @@ import { DeviceInfoFilterComponent } from '@home/components/device/device-info-f
     RateLimitsComponent,
     RateLimitsTextComponent,
     RateLimitsDetailsDialogComponent,
-    SendNotificationButtonComponent
+    SendNotificationButtonComponent,
+    EntityChipsComponent,
+    DashboardViewComponent,
+    CheckConnectivityDialogComponent,
+    AIModelDialogComponent,
+    ResourcesDialogComponent,
+    ResourcesLibraryComponent,
+    ApiKeysTableComponent,
+    ApiKeysTableDialogComponent,
+    EventsDialogComponent
   ],
   providers: [
     WidgetComponentService,
     CustomDialogService,
-    ImportExportService,
     {provide: EMBED_DASHBOARD_DIALOG_TOKEN, useValue: EmbedDashboardDialogComponent},
     {provide: COMPLEX_FILTER_PREDICATE_DIALOG_COMPONENT_TOKEN, useValue: ComplexFilterPredicateDialogComponent},
     {provide: DASHBOARD_PAGE_COMPONENT_TOKEN, useValue: DashboardPageComponent},

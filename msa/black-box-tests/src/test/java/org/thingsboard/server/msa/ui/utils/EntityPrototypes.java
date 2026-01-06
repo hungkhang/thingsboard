@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import org.thingsboard.server.common.data.DeviceProfileProvisionType;
 import org.thingsboard.server.common.data.DeviceProfileType;
 import org.thingsboard.server.common.data.DeviceTransportType;
 import org.thingsboard.server.common.data.EntityView;
+import org.thingsboard.server.common.data.Tenant;
 import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.alarm.Alarm;
 import org.thingsboard.server.common.data.alarm.AlarmSeverity;
@@ -35,12 +36,27 @@ import org.thingsboard.server.common.data.device.profile.DefaultDeviceProfileTra
 import org.thingsboard.server.common.data.device.profile.DeviceProfileData;
 import org.thingsboard.server.common.data.device.profile.DisabledDeviceProfileProvisionConfiguration;
 import org.thingsboard.server.common.data.id.CustomerId;
+import org.thingsboard.server.common.data.id.DeviceProfileId;
 import org.thingsboard.server.common.data.id.EntityId;
+import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.rule.RuleChain;
 import org.thingsboard.server.common.data.security.Authority;
 
 public class EntityPrototypes {
+
+    public static Tenant defaultTenantPrototype(String tenantName) {
+        Tenant tenant = new Tenant();
+        tenant.setTitle(tenantName);
+        return tenant;
+    }
+
+    public static Customer defaultCustomer(TenantId tenantId, String title) {
+        Customer customer = new Customer();
+        customer.setTenantId(tenantId);
+        customer.setTitle(title);
+        return customer;
+    }
 
     public static Customer defaultCustomerPrototype(String entityName) {
         Customer customer = new Customer();
@@ -168,6 +184,23 @@ public class EntityPrototypes {
         return user;
     }
 
+    public static User defaultTenantAdmin(TenantId tenantId, String email) {
+        User user = new User();
+        user.setTenantId(tenantId);
+        user.setEmail(email);
+        user.setAuthority(Authority.TENANT_ADMIN);
+        return user;
+    }
+
+    public static User defaultCustomerAdmin(TenantId tenantId, CustomerId customerId, String email) {
+        User user = new User();
+        user.setTenantId(tenantId);
+        user.setCustomerId(customerId);
+        user.setEmail(email);
+        user.setAuthority(Authority.CUSTOMER_USER);
+        return user;
+    }
+
     public static User defaultUser(String email, CustomerId customerId, String name) {
         User user = new User();
         user.setEmail(email);
@@ -189,6 +222,49 @@ public class EntityPrototypes {
         device.setName(name + RandomStringUtils.randomAlphanumeric(7));
         device.setCustomerId(id);
         device.setType("DEFAULT");
+        return device;
+    }
+
+    public static Device defaultDevicePrototype(String name, String description) {
+        Device device = new Device();
+        device.setName(name + RandomStringUtils.randomAlphanumeric(7));
+        device.setType("DEFAULT");
+        device.setAdditionalInfo(JacksonUtil.newObjectNode().put("description", description));
+        return device;
+    }
+
+    public static Device defaultDevicePrototype(String name, String description, String label) {
+        Device device = new Device();
+        device.setName(name + RandomStringUtils.randomAlphanumeric(7));
+        device.setType("DEFAULT");
+        device.setAdditionalInfo(JacksonUtil.newObjectNode().put("description", description));
+        device.setLabel(label);
+        return device;
+    }
+
+    public static Device defaultDevicePrototype(String name, boolean gateway) {
+        Device device = new Device();
+        device.setName(name + RandomStringUtils.randomAlphanumeric(7));
+        device.setType("DEFAULT");
+        device.setAdditionalInfo(JacksonUtil.newObjectNode().put("gateway", gateway));
+        return device;
+    }
+
+    public static Device defaultDevicePrototype(String name, boolean gateway, boolean overwriteActivityTime) {
+        Device device = new Device();
+        device.setName(name + RandomStringUtils.randomAlphanumeric(7));
+        device.setType("DEFAULT");
+        device.setAdditionalInfo(JacksonUtil.newObjectNode()
+                .put("gateway", gateway)
+                .put("overwriteActivityTime", overwriteActivityTime));
+        return device;
+    }
+
+    public static Device defaultDevicePrototype(String name, DeviceProfileId deviceProfileId) {
+        Device device = new Device();
+        device.setName(name + RandomStringUtils.randomAlphanumeric(7));
+        device.setType("DEFAULT");
+        device.setDeviceProfileId(deviceProfileId);
         return device;
     }
 

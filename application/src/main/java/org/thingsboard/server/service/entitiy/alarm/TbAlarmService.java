@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,11 @@ import org.thingsboard.server.common.data.User;
 import org.thingsboard.server.common.data.alarm.Alarm;
 import org.thingsboard.server.common.data.alarm.AlarmInfo;
 import org.thingsboard.server.common.data.exception.ThingsboardException;
+import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
+
+import java.util.List;
+import java.util.UUID;
 
 public interface TbAlarmService {
 
@@ -37,5 +41,8 @@ public interface TbAlarmService {
 
     AlarmInfo unassign(Alarm alarm, long unassignTs, User user) throws ThingsboardException;
 
-    Boolean delete(Alarm alarm, User user);
+    void unassignDeletedUserAlarms(TenantId tenantId, UserId userId, String userTitle, List<UUID> alarms, long unassignTs);
+
+    boolean delete(Alarm alarm, User user);
+
 }

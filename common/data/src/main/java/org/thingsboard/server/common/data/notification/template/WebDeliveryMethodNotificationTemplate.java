@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,16 +19,16 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
 import org.thingsboard.server.common.data.notification.NotificationDeliveryMethod;
 import org.thingsboard.server.common.data.validation.Length;
 import org.thingsboard.server.common.data.validation.NoXss;
 
-import javax.validation.constraints.NotEmpty;
+import java.util.List;
 import java.util.Optional;
 
 @Data
@@ -43,13 +43,19 @@ public class WebDeliveryMethodNotificationTemplate extends DeliveryMethodNotific
     private String subject;
     private JsonNode additionalConfig;
 
+    private final List<TemplatableValue> templatableValues = List.of(
+            TemplatableValue.of(this::getBody, this::setBody),
+            TemplatableValue.of(this::getSubject, this::setSubject),
+            TemplatableValue.of(this::getButtonText, this::setButtonText),
+            TemplatableValue.of(this::getButtonLink, this::setButtonLink)
+    );
+
     public WebDeliveryMethodNotificationTemplate(WebDeliveryMethodNotificationTemplate other) {
         super(other);
         this.subject = other.subject;
         this.additionalConfig = other.additionalConfig != null ? other.additionalConfig.deepCopy() : null;
     }
 
-    @NoXss(fieldName = "web notification message")
     @Length(fieldName = "web notification message", max = 250, message = "cannot be longer than 250 chars")
     @Override
     public String getBody() {
@@ -105,12 +111,6 @@ public class WebDeliveryMethodNotificationTemplate extends DeliveryMethodNotific
     @Override
     public WebDeliveryMethodNotificationTemplate copy() {
         return new WebDeliveryMethodNotificationTemplate(this);
-    }
-
-    @Override
-    public boolean containsAny(String... params) {
-        return super.containsAny(params) || StringUtils.containsAny(subject, params)
-                || StringUtils.containsAny(getButtonText(), params) || StringUtils.containsAny(getButtonLink(), params);
     }
 
 }

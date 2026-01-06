@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { Component, forwardRef, Input, OnInit } from '@angular/core';
+import { Component, DestroyRef, forwardRef, Input, OnInit } from '@angular/core';
 import {
   AbstractControl,
   ControlValueAccessor,
@@ -40,10 +40,13 @@ import {
   labelDataKeyValidator
 } from '@home/components/widget/lib/settings/chart/label-data-key.component';
 import { DataKeyType } from '@shared/models/telemetry/telemetry.models';
+import { defaultLegendConfig, widgetType } from '@shared/models/widget.models';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-export function flotDefaultSettings(chartType: ChartType): Partial<TbFlotSettings> {
+export const flotDefaultSettings = (chartType: ChartType): Partial<TbFlotSettings> => {
   const settings: Partial<TbFlotSettings> = {
     stack: false,
+    enableSelection: true,
     fontColor: '#545454',
     fontSize: 10,
     showTooltip: true,
@@ -72,7 +75,8 @@ export function flotDefaultSettings(chartType: ChartType): Partial<TbFlotSetting
       color: null,
       tickSize: null,
       tickDecimals: 0,
-      ticksFormatter: ''
+      ticksFormatter: '',
+      tickGenerator: ''
     }
   };
   if (chartType === 'graph') {
@@ -95,9 +99,11 @@ export function flotDefaultSettings(chartType: ChartType): Partial<TbFlotSetting
     };
     settings.customLegendEnabled = false;
     settings.dataKeysListForLabels = [];
+    settings.showLegend = true;
+    settings.legendConfig = defaultLegendConfig(widgetType.timeseries);
   }
   return settings;
-}
+};
 
 @Component({
   selector: 'tb-flot-widget-settings',
@@ -135,7 +141,8 @@ export class FlotWidgetSettingsComponent extends PageComponent implements OnInit
   constructor(protected store: Store<AppState>,
               private translate: TranslateService,
               private widgetService: WidgetService,
-              private fb: UntypedFormBuilder) {
+              private fb: UntypedFormBuilder,
+              private destroyRef: DestroyRef) {
     super(store);
   }
 
@@ -145,6 +152,7 @@ export class FlotWidgetSettingsComponent extends PageComponent implements OnInit
       // Common settings
 
       stack: [false, []],
+      enableSelection: [true, []],
       fontSize: [10, [Validators.min(0)]],
       fontColor: ['#545454', []],
 
@@ -221,37 +229,61 @@ export class FlotWidgetSettingsComponent extends PageComponent implements OnInit
         showLabels: [true, []]
       }));
 
+      // Legend settings
+
+      this.flotSettingsFormGroup.addControl('showLegend', this.fb.control(false, []));
+      this.flotSettingsFormGroup.addControl('legendConfig', this.fb.control(null, []));
+
       // Custom legend settings
 
       this.flotSettingsFormGroup.addControl('customLegendEnabled', this.fb.control(false, []));
       this.flotSettingsFormGroup.addControl('dataKeysListForLabels', this.fb.control(this.fb.array([]), []));
     }
 
-    this.flotSettingsFormGroup.get('showTooltip').valueChanges.subscribe(() => {
+    this.flotSettingsFormGroup.get('showTooltip').valueChanges.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => {
       this.updateValidators(true);
     });
 
-    this.flotSettingsFormGroup.get('xaxis.showLabels').valueChanges.subscribe(() => {
+    this.flotSettingsFormGroup.get('xaxis.showLabels').valueChanges.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => {
       this.updateValidators(true);
     });
 
-    this.flotSettingsFormGroup.get('yaxis.showLabels').valueChanges.subscribe(() => {
+    this.flotSettingsFormGroup.get('yaxis.showLabels').valueChanges.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => {
       this.updateValidators(true);
     });
 
     if (this.chartType === 'graph' || this.chartType === 'bar') {
-      this.flotSettingsFormGroup.get('comparisonEnabled').valueChanges.subscribe(() => {
+      this.flotSettingsFormGroup.get('showLegend').valueChanges.pipe(
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe(() => {
         this.updateValidators(true);
       });
-      this.flotSettingsFormGroup.get('timeForComparison').valueChanges.subscribe(() => {
+      this.flotSettingsFormGroup.get('comparisonEnabled').valueChanges.pipe(
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe(() => {
         this.updateValidators(true);
       });
-      this.flotSettingsFormGroup.get('customLegendEnabled').valueChanges.subscribe(() => {
+      this.flotSettingsFormGroup.get('timeForComparison').valueChanges.pipe(
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe(() => {
+        this.updateValidators(true);
+      });
+      this.flotSettingsFormGroup.get('customLegendEnabled').valueChanges.pipe(
+        takeUntilDestroyed(this.destroyRef)
+      ).subscribe(() => {
         this.updateValidators(true);
       });
     }
 
-    this.flotSettingsFormGroup.valueChanges.subscribe(() => {
+    this.flotSettingsFormGroup.valueChanges.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => {
       this.updateModel();
     });
 
@@ -271,6 +303,7 @@ export class FlotWidgetSettingsComponent extends PageComponent implements OnInit
       this.flotSettingsFormGroup.disable({emitEvent: false});
     } else {
       this.flotSettingsFormGroup.enable({emitEvent: false});
+      this.updateValidators(false);
     }
   }
 
@@ -350,9 +383,15 @@ export class FlotWidgetSettingsComponent extends PageComponent implements OnInit
     this.flotSettingsFormGroup.get('yaxis.ticksFormatter').updateValueAndValidity({emitEvent: false});
 
     if (this.chartType === 'graph' || this.chartType === 'bar') {
+      const showLegend: boolean = this.flotSettingsFormGroup.get('showLegend').value;
       const comparisonEnabled: boolean = this.flotSettingsFormGroup.get('comparisonEnabled').value;
       const timeForComparison: ComparisonDuration = this.flotSettingsFormGroup.get('timeForComparison').value;
       const customLegendEnabled: boolean = this.flotSettingsFormGroup.get('customLegendEnabled').value;
+      if (showLegend) {
+        this.flotSettingsFormGroup.get('legendConfig').enable({emitEvent});
+      } else {
+        this.flotSettingsFormGroup.get('legendConfig').disable({emitEvent});
+      }
       if (comparisonEnabled) {
         this.flotSettingsFormGroup.get('timeForComparison').enable({emitEvent: false});
         if (timeForComparison === 'customInterval') {
@@ -360,9 +399,11 @@ export class FlotWidgetSettingsComponent extends PageComponent implements OnInit
         } else {
           this.flotSettingsFormGroup.get('comparisonCustomIntervalValue').disable({emitEvent});
         }
+        this.flotSettingsFormGroup.get('xaxisSecond').enable({emitEvent: false});
       } else {
         this.flotSettingsFormGroup.get('timeForComparison').disable({emitEvent: false});
         this.flotSettingsFormGroup.get('comparisonCustomIntervalValue').disable({emitEvent});
+        this.flotSettingsFormGroup.get('xaxisSecond').disable({emitEvent: false});
       }
       if (customLegendEnabled) {
         this.flotSettingsFormGroup.get('dataKeysListForLabels').enable({emitEvent});
@@ -370,8 +411,10 @@ export class FlotWidgetSettingsComponent extends PageComponent implements OnInit
         this.flotSettingsFormGroup.get('dataKeysListForLabels').disable({emitEvent});
       }
 
+      this.flotSettingsFormGroup.get('legendConfig').updateValueAndValidity({emitEvent: false});
       this.flotSettingsFormGroup.get('timeForComparison').updateValueAndValidity({emitEvent: false});
       this.flotSettingsFormGroup.get('comparisonCustomIntervalValue').updateValueAndValidity({emitEvent: false});
+      this.flotSettingsFormGroup.get('xaxisSecond').updateValueAndValidity({emitEvent: false});
       this.flotSettingsFormGroup.get('dataKeysListForLabels').updateValueAndValidity({emitEvent: false});
     }
   }

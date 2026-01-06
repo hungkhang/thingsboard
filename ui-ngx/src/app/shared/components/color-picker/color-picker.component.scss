@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@import "../scss/constants";
+
 :host {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 32px;
+  overflow: auto;
+
+  .color-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    @media #{$mat-sm} {
+      flex-direction: row;
+      gap: 12px;
+    }
+  }
+
+  .control-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    @media #{$mat-sm} {
+      width: 100%;
+      justify-content: center;
+    }
+  }
 
   .saturation-component {
-    height: 100%;
-    min-height: 200px;
-    max-height: 300px;
+    width: 100%;
+    height: 238px;
+    min-height: 160px;
     border-radius: 8px;
+    @media #{$mat-sm} {
+      max-height: 160px;
+    }
   }
 
   .control-component {
@@ -54,7 +80,15 @@
   }
 
   .color-input-block {
+    height: 56px;
     display: flex;
+    align-items: center;
+    gap: 20px;
+
+    .presentation-select {
+      font-size: 14px;
+      width: 56px;
+    }
 
     .color-input {
       flex: 1;
@@ -63,15 +97,17 @@
         color: initial;
       }
     }
+  }
 
-    .type-btn {
-      height: 26px;
-      width: 20px;
-      background: transparent url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAAgCAMAAAAootjDAAAAM1BMVEUAAAAzMzMzMzMzMzMzMzM0NDQzMzMzMzM0NDQzMzMzMzM0NDQzMzMzMzMyMjIrKyszMzPF8UZlAAAAEHRSTlMA1fHr4ZxxSRP45sG+sCkGH2+Z6QAAAHJJREFUKM+9kkkSgCAQA0FEVLb5/2tViqgQvNrHviSzKGCt6nDGuNass8i8NsrLiX+bZbrUtDwm7VLYE0zWUtEZ+RvUZpEvN8YhH9QmQRoC8kFpEnVHVP/DJUZVeSAem5fDKxwtms/BR+PT8gN8vwk/0wE1gQzNVYryIwAAAABJRU5ErkJggg==') no-repeat center;
-      background-size: 6px 12px;
-
-      &:hover {
-        background-color: #eee;
+  .color-presets-block {
+    .color-presets-component {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      @media #{$mat-xs} {
+        flex-direction: column;
       }
     }
   }
@@ -88,7 +124,9 @@
 
   indicator-component {
     svg {
-      vertical-align: -70% !important;
+      transform: scale(0.5);
+      height: 100% !important;
+      vertical-align: baseline !important;
     }
   }
 
@@ -102,6 +140,26 @@
       }
       .gradient-color {
         border-radius: 9px;
+      }
+    }
+  }
+
+  .color-presets-component {
+    .presets-row {
+      gap: 8px;
+      justify-content: space-between;
+    }
+    color-preset {
+      height: 20px;
+      width: 20px;
+      border-radius: 4px;
+      @media #{$mat-xs} {
+        height: 40px;
+        width: 48px;
+      }
+      @media #{$mat-sm} {
+        height: 40px;
+        width: 40px;
       }
     }
   }

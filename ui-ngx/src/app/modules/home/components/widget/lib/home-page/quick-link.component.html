@@ -1,6 +1,6 @@
 <!--
 
-    Copyright © 2016-2023 The Thingsboard Authors
+    Copyright © 2016-2025 The Thingsboard Authors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
     limitations under the License.
 
 -->
-<div fxLayout="row" *ngIf="addMode || editMode; else quickLinkTemplate">
-  <div fxFlex class="tb-edit-link" [ngClass]="{'edit-mode': editMode}" [formGroup]="editQuickLinkFormGroup" fxLayout="column">
-    <mat-form-field fxFlex class="mat-block">
+<div class="flex flex-row" *ngIf="addMode || editMode; else quickLinkTemplate">
+  <div class="tb-edit-link flex flex-1 flex-col" [class.edit-mode]="editMode" [formGroup]="editQuickLinkFormGroup">
+    <mat-form-field class="mat-block flex-1">
       <mat-label translate>widgets.quick-links.quick-link</mat-label>
       <input matInput type="text"
              #linkInput
@@ -25,21 +25,19 @@
              (focusin)="onFocus()"
              required
              [matAutocomplete]="linkAutocomplete">
-      <mat-icon matPrefix *ngIf="quickLink && !quickLink.isMdiIcon" color="primary">{{ quickLink.icon }}</mat-icon>
-      <mat-icon matPrefix *ngIf="quickLink && quickLink.isMdiIcon" color="primary" [svgIcon]="quickLink.icon"></mat-icon>
+      <tb-icon matPrefix *ngIf="quickLink" color="primary">{{ quickLink.icon }}</tb-icon>
       <button *ngIf="editQuickLinkFormGroup.get('link').value && !disabled"
               type="button"
               matSuffix mat-icon-button aria-label="Clear"
               (click)="clear()">
-        <mat-icon class="material-icons">close</mat-icon>
+        <tb-icon>close</tb-icon>
       </button>
       <mat-autocomplete
         class="tb-autocomplete tb-quick-links"
         #linkAutocomplete="matAutocomplete"
         [displayWith]="displayLinkFn">
         <mat-option *ngFor="let link of filteredLinks | async" [value]="link">
-          <mat-icon *ngIf="!link.isMdiIcon">{{ link.icon }}</mat-icon>
-          <mat-icon *ngIf="link.isMdiIcon" [svgIcon]="link.icon"></mat-icon>
+          <tb-icon>{{ link.icon }}</tb-icon>
           <span [innerHTML]="link.name | highlight:searchText"></span>
         </mat-option>
         <mat-option *ngIf="!(filteredLinks | async)?.length" [value]="null">
@@ -52,39 +50,38 @@
         {{ 'widgets.quick-links.quick-link-required' | translate }}
       </mat-error>
     </mat-form-field>
-    <div *ngIf="addMode" fxLayout="row" fxLayoutAlign="end" fxLayoutGap="8px">
+    <div *ngIf="addMode" class="flex flex-row items-stretch justify-end gap-2">
       <button *ngIf="!addOnly" mat-button color="primary" (click)="cancelAdd()">{{ 'action.cancel' | translate }}</button>
       <button mat-raised-button color="primary" (click)="add()">{{ 'action.add' | translate }}</button>
     </div>
   </div>
-  <div *ngIf="editMode" fxLayout="row" class="tb-edit-buttons">
-    <button mat-icon-button (click)="apply()"><mat-icon>check</mat-icon></button>
-    <button mat-icon-button (click)="cancelEdit()"><mat-icon>close</mat-icon></button>
+  <div *ngIf="editMode" class="tb-edit-buttons flex flex-row">
+    <button mat-icon-button (click)="apply()"><tb-icon>check</tb-icon></button>
+    <button mat-icon-button (click)="cancelEdit()"><tb-icon>close</tb-icon></button>
   </div>
 </div>
 <ng-template #quickLinkTemplate>
-  <div fxLayout="row">
-    <div fxFlex class="tb-link">
+  <div class="flex flex-row">
+    <div class="tb-link flex-1">
       <div class="tb-link-container">
         <div class="tb-link-icon-container">
-          <mat-icon *ngIf="!quickLink?.isMdiIcon" color="primary">{{ quickLink?.icon }}</mat-icon>
-          <mat-icon *ngIf="quickLink?.isMdiIcon" color="primary" [svgIcon]="quickLink?.icon"></mat-icon>
+          <tb-icon color="primary">{{ quickLink?.icon }}</tb-icon>
         </div>
         <div class="tb-link-text">{{ displayLinkFn(quickLink) }}</div>
       </div>
     </div>
-    <div fxLayout="row" fxLayoutAlign="start center" class="tb-edit-buttons">
+    <div class="tb-edit-buttons flex flex-row items-center justify-start">
       <button mat-icon-button
               matTooltip="{{ 'action.edit' | translate }}"
               matTooltipPosition="above"
               (click)="switchToEditMode()">
-        <mat-icon>edit</mat-icon>
+        <tb-icon>edit</tb-icon>
       </button>
       <button mat-icon-button
               matTooltip="{{ 'action.delete' | translate }}"
               matTooltipPosition="above"
               (click)="delete()">
-        <mat-icon>delete</mat-icon>
+        <tb-icon>delete</tb-icon>
       </button>
     </div>
   </div>

@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,6 @@
  */
 package org.thingsboard.server.common.data;
 
-/**
- * @author Andrew Shvayka
- */
 public class DataConstants {
 
     public static final String TENANT = "TENANT";
@@ -43,14 +40,22 @@ public class DataConstants {
     public static final String RETRIES = "retries";
     public static final String EDGE_ID = "edgeId";
     public static final String DEVICE_ID = "deviceId";
+    public static final String GATEWAY_PARAMETER = "gateway";
+    public static final String CF_NAME_METADATA_KEY = "calculatedFieldName";
+
+    public static final String OVERWRITE_ACTIVITY_TIME_PARAMETER = "overwriteActivityTime";
     public static final String COAP_TRANSPORT_NAME = "COAP";
     public static final String LWM2M_TRANSPORT_NAME = "LWM2M";
     public static final String MQTT_TRANSPORT_NAME = "MQTT";
     public static final String HTTP_TRANSPORT_NAME = "HTTP";
     public static final String SNMP_TRANSPORT_NAME = "SNMP";
+    public static final String MAXIMUM_NUMBER_OF_DEVICES_REACHED = "Maximum number of devices reached!";
+
+    public static final String TB_IMAGE_PREFIX = "tb-image;";
+    public static final String TB_RESOURCE_PREFIX = "tb-resource;";
 
 
-    public static final String[] allScopes() {
+    public static String[] allScopes() {
         return new String[]{CLIENT_SCOPE, SHARED_SCOPE, SERVER_SCOPE};
     }
 
@@ -101,6 +106,8 @@ public class DataConstants {
     public static final String RPC_FAILED = "RPC_FAILED";
     public static final String RPC_DELETED = "RPC_DELETED";
 
+    public static final String REEVALUATION_MSG = "REEVALUATION_MSG";
+
     public static final String DEFAULT_SECRET_KEY = "";
     public static final String SECRET_KEY_FIELD_NAME = "secretKey";
     public static final String DURATION_MS_FIELD_NAME = "durationMs";
@@ -109,6 +116,7 @@ public class DataConstants {
     public static final String PROVISION_KEY = "provisionDeviceKey";
     public static final String PROVISION_SECRET = "provisionDeviceSecret";
 
+    public static final String DEFAULT_DEVICE_TYPE = "default";
     public static final String DEVICE_NAME = "deviceName";
     public static final String DEVICE_TYPE = "deviceType";
     public static final String CERT_PUB_KEY = "x509CertPubKey";
@@ -120,8 +128,11 @@ public class DataConstants {
     public static final String PASSWORD = "password";
     public static final String EDGE_MSG_SOURCE = "edge";
     public static final String MSG_SOURCE_KEY = "source";
+    public static final String EDGE_VERSION_ATTR_KEY = "edgeVersion";
 
     public static final String LAST_CONNECTED_GATEWAY = "lastConnectedGateway";
+
+    public static final String MQTT_TOPIC = "mqttTopic";
 
     public static final String MAIN_QUEUE_NAME = "Main";
     public static final String MAIN_QUEUE_TOPIC = "tb_rule_engine.main";
@@ -129,5 +140,14 @@ public class DataConstants {
     public static final String HP_QUEUE_TOPIC = "tb_rule_engine.hp";
     public static final String SQ_QUEUE_NAME = "SequentialByOriginator";
     public static final String SQ_QUEUE_TOPIC = "tb_rule_engine.sq";
+    public static final String QUEUE_NAME = "queueName";
+
+    public static final String EDGE_QUEUE_NAME = "Edge";
+    public static final String EDGE_EVENT_QUEUE_NAME = "EdgeEvent";
+
+    public static final String CF_QUEUE_NAME = "CalculatedFields";
+    public static final String CF_STATES_QUEUE_NAME = "CalculatedFieldStates";
+
+    public static final String LATEST_TELEMETRY_SCOPE = "LATEST_TELEMETRY";
 
 }

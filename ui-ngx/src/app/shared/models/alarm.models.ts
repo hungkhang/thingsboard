@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import { TableCellButtonActionDescriptor } from '@home/components/widget/lib/tab
 import { AlarmCommentId } from '@shared/models/id/alarm-comment-id';
 import { UserId } from '@shared/models/id/user-id';
 import { AlarmFilter } from '@shared/models/query/query.models';
+import { HasTenantId } from '@shared/models/entity.models';
+import { isNotEmptyStr } from '@core/utils';
 
 export enum AlarmsMode {
   ALL,
@@ -86,15 +88,25 @@ export const alarmSearchStatusTranslations = new Map<AlarmSearchStatus, string>(
 
 export const alarmSeverityColors = new Map<AlarmSeverity, string>(
   [
-    [AlarmSeverity.CRITICAL, 'red'],
-    [AlarmSeverity.MAJOR, 'orange'],
-    [AlarmSeverity.MINOR, '#ffca3d'],
-    [AlarmSeverity.WARNING, '#abab00'],
-    [AlarmSeverity.INDETERMINATE, 'green']
+    [AlarmSeverity.CRITICAL, 'var(--tb-alarm-severity-critical, rgb(209, 39, 48))'],
+    [AlarmSeverity.MAJOR, 'var(--tb-alarm-severity-major, rgb(246, 103, 22))'],
+    [AlarmSeverity.MINOR, 'var(--tb-alarm-severity-minor, rgb(250, 164, 5))'],
+    [AlarmSeverity.WARNING, 'var(--tb-alarm-severity-warning, rgb(242, 218, 5))'],
+    [AlarmSeverity.INDETERMINATE, 'var(--tb-alarm-severity-indeterminate, rgba(0, 0, 0, 0.38))']
   ]
 );
 
-export interface Alarm extends BaseData<AlarmId> {
+export const alarmSeverityBackgroundColors = new Map<AlarmSeverity, string>(
+  [
+    [AlarmSeverity.CRITICAL, `var(--tb-alarm-severity-critical-bg, rgba(209, 39, 48, 0.06))`],
+    [AlarmSeverity.MAJOR, 'var(--tb-alarm-severity-major-bg, rgba(246, 103, 22, 0.06))'],
+    [AlarmSeverity.MINOR, 'var(--tb-alarm-severity-minor-bg, rgba(250, 164, 5, 0.06))'],
+    [AlarmSeverity.WARNING, 'var(--tb-alarm-severity-warning-bg, rgba(242, 218, 5, 0.06))'],
+    [AlarmSeverity.INDETERMINATE, 'var(--tb-alarm-severity-indeterminate-bg, rgba(0, 0, 0, 0.06))']
+  ]
+);
+
+export interface Alarm extends BaseData<AlarmId>, HasTenantId {
   tenantId: TenantId;
   customerId: CustomerId;
   assigneeId: UserId;
@@ -102,6 +114,8 @@ export interface Alarm extends BaseData<AlarmId> {
   originator: EntityId;
   severity: AlarmSeverity;
   status: AlarmStatus;
+  acknowledged: boolean;
+  cleared: boolean;
   startTs: number;
   endTs: number;
   ackTs: number;
@@ -116,15 +130,30 @@ export enum AlarmCommentType {
   OTHER = 'OTHER'
 }
 
+export enum AlarmMessage {
+  ACKED_BY_USER = "alarm.system-comments.acked-by-user",
+  CLEARED_BY_USER = "alarm.system-comments.cleared-by-user",
+  ASSIGNED_TO_USER = "alarm.system-comments.assigned-to-user",
+  UNASSIGNED_BY_USER = "alarm.system-comments.unassigned-to-user",
+  UNASSIGNED_FROM_DELETED_USER = "alarm.system-comments.unassigned-from-deleted-user",
+  COMMENT_DELETED = "alarm.system-comments.comment-deleted",
+  SEVERITY_CHANGED = "alarm.system-comments.severity-changed",
+}
+
 export interface AlarmComment extends BaseData<AlarmCommentId> {
   alarmId: AlarmId;
   userId?: UserId;
   type: AlarmCommentType;
   comment: {
     text: string;
+    subtype?: keyof typeof AlarmMessage;
+    userName?: string;
+    assigneeName?: string;
+    oldSeverity?: AlarmSeverity;
+    newSeverity?: AlarmSeverity;
     edited?: boolean;
     editedOn?: number;
-  }
+  };
 }
 
 export interface AlarmCommentInfo extends AlarmComment {
@@ -136,6 +165,7 @@ export interface AlarmCommentInfo extends AlarmComment {
 export interface AlarmInfo extends Alarm {
   originatorName: string;
   originatorLabel: string;
+  originatorDisplayName?: string;
   assignee: AlarmAssignee;
 }
 
@@ -143,6 +173,11 @@ export interface AlarmAssignee {
   firstName: string;
   lastName: string;
   email: string;
+}
+
+export enum AlarmAssigneeOption {
+  noAssignee = 'noAssignee',
+  currentUser = 'currentUser'
 }
 
 export interface AlarmDataInfo extends AlarmInfo {
@@ -163,11 +198,12 @@ export const simulatedAlarm: AlarmInfo = {
   clearTs: 0,
   assignTs: 0,
   originatorName: 'Simulated',
+  originatorDisplayName: 'Simulated',
   originatorLabel: 'Simulated',
   assignee: {
-    firstName: "",
-    lastName: "",
-    email: "test@example.com",
+    firstName: '',
+    lastName: '',
+    email: 'test@example.com',
   },
   originator: {
     entityType: EntityType.DEVICE,
@@ -176,6 +212,8 @@ export const simulatedAlarm: AlarmInfo = {
   type: 'TEMPERATURE',
   severity: AlarmSeverity.MAJOR,
   status: AlarmStatus.ACTIVE_UNACK,
+  acknowledged: false,
+  cleared: false,
   details: {
     message: 'Temperature is high!'
   },
@@ -231,6 +269,11 @@ export const alarmFields: {[fieldName: string]: AlarmField} = {
     value: 'originatorName',
     name: 'alarm.originator'
   },
+  originatorDisplayName: {
+    keyName: 'originatorDisplayName',
+    value: 'originatorDisplayName',
+    name: 'alarm.originator'
+  },
   originatorLabel: {
     keyName: 'originatorLabel',
     value: 'originatorLabel',
@@ -260,6 +303,11 @@ export const alarmFields: {[fieldName: string]: AlarmField} = {
     keyName: 'assignee',
     value: 'assignee',
     name: 'alarm.assignee'
+  },
+  details: {
+    keyName: 'details',
+    value: 'details',
+    name: 'alarm.details'
   }
 };
 
@@ -325,7 +373,7 @@ export class AlarmQueryV2 {
     let query = this.affectedEntityId ? `/${this.affectedEntityId.entityType}/${this.affectedEntityId.id}` : '';
     query += this.pageLink.toQuery();
     if (this.typeList && this.typeList.length) {
-      query += `&typeList=${this.typeList.join(',')}`;
+      query += `&typeList=${this.typeList.map(type => encodeURIComponent(type)).join(',')}`;
     }
     if (this.statusList && this.statusList.length) {
       query += `&statusList=${this.statusList.join(',')}`;
@@ -340,3 +388,36 @@ export class AlarmQueryV2 {
   }
 
 }
+
+export const getUserDisplayName = (alarmAssignee: AlarmAssignee |  AlarmCommentInfo) => {
+  let displayName = '';
+  if (isNotEmptyStr(alarmAssignee.firstName) || isNotEmptyStr(alarmAssignee.lastName)) {
+    if (alarmAssignee.firstName) {
+      displayName += alarmAssignee.firstName;
+    }
+    if (alarmAssignee.lastName) {
+      if (displayName.length > 0) {
+        displayName += ' ';
+      }
+      displayName += alarmAssignee.lastName;
+    }
+  } else {
+    displayName = alarmAssignee.email;
+  }
+  return displayName;
+};
+
+export const getUserInitials = (alarmAssignee: AlarmAssignee): string => {
+  let initials = '';
+  if (isNotEmptyStr(alarmAssignee.firstName) || isNotEmptyStr(alarmAssignee.lastName)) {
+    if (alarmAssignee.firstName) {
+      initials += alarmAssignee.firstName.charAt(0);
+    }
+    if (alarmAssignee.lastName) {
+      initials += alarmAssignee.lastName.charAt(0);
+    }
+  } else {
+    initials += alarmAssignee.email.charAt(0);
+  }
+  return initials.toUpperCase();
+};

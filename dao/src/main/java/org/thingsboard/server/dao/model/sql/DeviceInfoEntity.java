@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,20 @@
  */
 package org.thingsboard.server.dao.model.sql;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.Immutable;
 import org.thingsboard.server.common.data.DeviceInfo;
 import org.thingsboard.server.dao.model.ModelConstants;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Table;
-
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Entity
 @Immutable
-@Table(name = ModelConstants.DEVICE_INFO_VIEW_COLUMN_FAMILY_NAME)
+@Table(name = ModelConstants.DEVICE_INFO_VIEW_TABLE_NAME)
 public class DeviceInfoEntity extends AbstractDeviceEntity<DeviceInfo> {
 
     @Column(name = ModelConstants.DEVICE_CUSTOMER_TITLE_PROPERTY)

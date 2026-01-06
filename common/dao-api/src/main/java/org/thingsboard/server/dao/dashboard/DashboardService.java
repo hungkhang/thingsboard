@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import org.thingsboard.server.dao.entity.EntityDaoService;
 import java.util.List;
 
 public interface DashboardService extends EntityDaoService {
-    
+
     Dashboard findDashboardById(TenantId tenantId, DashboardId dashboardId);
 
     ListenableFuture<Dashboard> findDashboardByIdAsync(TenantId tenantId, DashboardId dashboardId);
@@ -39,6 +39,8 @@ public interface DashboardService extends EntityDaoService {
     String findDashboardTitleById(TenantId tenantId, DashboardId dashboardId);
 
     ListenableFuture<DashboardInfo> findDashboardInfoByIdAsync(TenantId tenantId, DashboardId dashboardId);
+
+    Dashboard saveDashboard(Dashboard dashboard, boolean doValidate);
 
     Dashboard saveDashboard(Dashboard dashboard);
 
@@ -70,6 +72,14 @@ public interface DashboardService extends EntityDaoService {
 
     DashboardInfo findFirstDashboardInfoByTenantIdAndName(TenantId tenantId, String name);
 
+    ListenableFuture<DashboardInfo> findFirstDashboardInfoByTenantIdAndNameAsync(TenantId tenantId, String name);
+
     List<Dashboard> findTenantDashboardsByTitle(TenantId tenantId, String title);
+
+    boolean existsById(TenantId tenantId, DashboardId dashboardId);
+
+    PageData<DashboardId> findAllDashboardsIds(PageLink pageLink);
+
+    List<DashboardInfo> findDashboardInfoByIds(TenantId tenantId, List<DashboardId> dashboardIds);
 
 }

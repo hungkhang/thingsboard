@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 ///
 
 import { Injectable, NgModule } from '@angular/core';
-import { ActivatedRouteSnapshot, Resolve, RouterModule, Routes } from '@angular/router';
+import { ActivatedRouteSnapshot, RouterModule, Routes } from '@angular/router';
 
 import { EntitiesTableComponent } from '../../components/entity/entities-table.component';
 import { Authority } from '@shared/models/authority.enum';
@@ -32,9 +32,11 @@ import { UserDashboardAction } from '@shared/models/user-settings.models';
 import { Store } from '@ngrx/store';
 import { AppState } from '@core/core.state';
 import { getCurrentAuthUser } from '@core/auth/auth.selectors';
+import { ConfirmOnExitGuard } from '@core/guards/confirm-on-exit.guard';
+import { MenuId } from '@core/services/menu.models';
 
 @Injectable()
-export class DashboardResolver implements Resolve<Dashboard> {
+export class DashboardResolver  {
 
   constructor(private store: Store<AppState>,
               private dashboardService: DashboardService,
@@ -65,8 +67,7 @@ const routes: Routes = [
     path: 'dashboards',
     data: {
       breadcrumb: {
-        label: 'dashboard.dashboards',
-        icon: 'dashboard'
+        menuId: MenuId.dashboards
       }
     },
     children: [
@@ -85,6 +86,7 @@ const routes: Routes = [
       {
         path: ':dashboardId',
         component: DashboardPageComponent,
+        canDeactivate: [ConfirmOnExitGuard],
         data: {
           breadcrumb: {
             labelFunction: dashboardBreadcumbLabelFunction,

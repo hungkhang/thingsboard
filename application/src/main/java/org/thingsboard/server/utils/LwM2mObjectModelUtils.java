@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 package org.thingsboard.server.utils;
 
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.leshan.core.model.DDFFileParser;
-import org.eclipse.leshan.core.model.DefaultDDFFileValidator;
 import org.eclipse.leshan.core.model.InvalidDDFFileException;
 import org.eclipse.leshan.core.model.ObjectModel;
 import org.thingsboard.server.common.data.ResourceType;
@@ -28,12 +26,11 @@ import org.thingsboard.server.common.data.lwm2m.LwM2mInstance;
 import org.thingsboard.server.common.data.lwm2m.LwM2mObject;
 import org.thingsboard.server.common.data.lwm2m.LwM2mResourceObserve;
 import org.thingsboard.server.common.data.util.TbDDFFileParser;
-import org.thingsboard.server.dao.exception.DataValidationException;
+import org.thingsboard.server.exception.DataValidationException;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 
 import static org.thingsboard.server.common.data.lwm2m.LwM2mConstants.LWM2M_SEPARATOR_KEY;
@@ -41,13 +38,13 @@ import static org.thingsboard.server.common.data.lwm2m.LwM2mConstants.LWM2M_SEPA
 
 @Slf4j
 public class LwM2mObjectModelUtils {
-    
+
     private static final TbDDFFileParser ddfFileParser = new TbDDFFileParser();
-    
-    public static void toLwm2mResource (TbResource resource) throws ThingsboardException {
+
+    public static void toLwm2mResource(TbResource resource) throws ThingsboardException {
         try {
             List<ObjectModel> objectModels =
-                    ddfFileParser.parse(new ByteArrayInputStream(Base64.getDecoder().decode(resource.getData())), resource.getSearchText());
+                    ddfFileParser.parse(new ByteArrayInputStream(resource.getData()), resource.getSearchText());
             if (!objectModels.isEmpty()) {
                 ObjectModel objectModel = objectModels.get(0);
 
@@ -75,8 +72,8 @@ public class LwM2mObjectModelUtils {
     public static LwM2mObject toLwM2mObject(TbResource resource, boolean isSave) {
         try {
             List<ObjectModel> objectModels =
-                    ddfFileParser.parse(new ByteArrayInputStream(Base64.getDecoder().decode(resource.getData())), resource.getSearchText());
-            if (objectModels.size() == 0) {
+                    ddfFileParser.parse(new ByteArrayInputStream(resource.getData()), resource.getSearchText());
+            if (objectModels.isEmpty()) {
                 return null;
             } else {
                 ObjectModel obj = objectModels.get(0);
@@ -98,7 +95,7 @@ public class LwM2mObjectModelUtils {
                         resources.add(lwM2MResourceObserve);
                     }
                 });
-                if (isSave || resources.size() > 0) {
+                if (isSave || !resources.isEmpty()) {
                     instance.setResources(resources.toArray(LwM2mResourceObserve[]::new));
                     lwM2mObject.setInstances(new LwM2mInstance[]{instance});
                     return lwM2mObject;

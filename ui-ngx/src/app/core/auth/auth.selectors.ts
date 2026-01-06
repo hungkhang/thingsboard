@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import { AuthState } from './auth.models';
 import { take } from 'rxjs/operators';
 import { AuthUser } from '@shared/models/user.model';
 import { UserSettings } from '@shared/models/user-settings.models';
+import { getDescendantProp } from '@core/utils';
 
 export const selectAuthState = createFeatureSelector< AuthState>(
   'auth'
@@ -39,6 +40,12 @@ export const selectIsAuthenticated = createSelector(
 export const selectIsUserLoaded = createSelector(
   selectAuthState,
   (state: AuthState) => state.isUserLoaded
+);
+
+export const selectUserReady = createSelector(
+  selectIsAuthenticated,
+  selectIsUserLoaded,
+  (isAuthenticated, isUserLoaded) => ({isAuthenticated, isUserLoaded})
 );
 
 export const selectAuthUser = createSelector(
@@ -71,9 +78,25 @@ export const selectPersistDeviceStateToTelemetry = createSelector(
   (state: AuthState) => state.persistDeviceStateToTelemetry
 );
 
+export const selectMobileQrEnabled = createSelector(
+  selectAuthState,
+  (state: AuthState) => state.mobileQrEnabled
+);
+
+export const selectHomeDashboardParams = createSelector(
+  selectPersistDeviceStateToTelemetry,
+  selectMobileQrEnabled,
+  (persistDeviceStateToTelemetry, mobileQrEnabled) => ({persistDeviceStateToTelemetry, mobileQrEnabled})
+);
+
 export const selectUserSettings = createSelector(
   selectAuthState,
   (state: AuthState) => state.userSettings
+);
+
+export const selectUserSettingsProperty = (path: NestedKeyOf<UserSettings>) => createSelector(
+  selectAuthState,
+  (state: AuthState) => getDescendantProp(state.userSettings, path)
 );
 
 export const selectOpenedMenuSections = createSelector(

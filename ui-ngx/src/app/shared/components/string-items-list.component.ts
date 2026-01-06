@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,13 +14,28 @@
 /// limitations under the License.
 ///
 
-import { Component, forwardRef, Input } from '@angular/core';
-import { ControlValueAccessor, FormBuilder, FormGroup, NG_VALUE_ACCESSOR, Validators } from '@angular/forms';
+import { Component, ElementRef, forwardRef, Input, OnInit, ViewChild, ViewEncapsulation } from '@angular/core';
+import {
+  AbstractControl,
+  ControlValueAccessor,
+  FormBuilder,
+  FormGroup,
+  NG_VALUE_ACCESSOR,
+  Validators
+} from '@angular/forms';
 import { MatChipInputEvent } from '@angular/material/chips';
 import { COMMA, ENTER, SEMICOLON } from '@angular/cdk/keycodes';
 import { FloatLabelType, MatFormFieldAppearance, SubscriptSizing } from '@angular/material/form-field';
-import { coerceBoolean } from '@shared/decorators/coercion';
+import { coerceArray, coerceBoolean } from '@shared/decorators/coercion';
+import { Observable, of } from 'rxjs';
+import { filter, mergeMap, share, tap } from 'rxjs/operators';
+import { MatAutocompleteTrigger } from '@angular/material/autocomplete';
+import { isDefined, isUndefined } from '@core/utils';
 
+export interface StringItemsOption {
+  name: string;
+  value: any;
+}
 @Component({
   selector: 'tb-string-items-list',
   templateUrl: './string-items-list.component.html',
@@ -31,19 +46,32 @@ import { coerceBoolean } from '@shared/decorators/coercion';
       useExisting: forwardRef(() => StringItemsListComponent),
       multi: true
     }
-  ]
+  ],
+  encapsulation: ViewEncapsulation.None
 })
-export class StringItemsListComponent implements ControlValueAccessor{
+export class StringItemsListComponent implements ControlValueAccessor, OnInit {
 
   stringItemsForm: FormGroup;
+
+  filteredValues: Observable<Array<StringItemsOption>>;
+
+  searchText = '';
+
+  itemList: StringItemsOption[] = [];
+
   private modelValue: Array<string> | null;
 
   readonly separatorKeysCodes: number[] = [ENTER, COMMA, SEMICOLON];
 
+  @ViewChild('stringItemInput', {static: true}) stringItemInput: ElementRef<HTMLInputElement>;
+  @ViewChild(MatAutocompleteTrigger) autocomplete: MatAutocompleteTrigger;
+
   private requiredValue: boolean;
+
   get required(): boolean {
     return this.requiredValue;
   }
+
   @Input()
   @coerceBoolean()
   set required(value: boolean) {
@@ -80,19 +108,63 @@ export class StringItemsListComponent implements ControlValueAccessor{
   editable = false;
 
   @Input()
-  subscriptSizing: SubscriptSizing = 'fixed'
+  subscriptSizing: SubscriptSizing = 'fixed';
 
-  private propagateChange = (v: any) => { };
+  @Input()
+  fieldClass: string;
+
+  @Input()
+  @coerceArray()
+  predefinedValues: StringItemsOption[];
+
+  @Input()
+  fetchOptionsFn: (searchText?: string) => Observable<Array<StringItemsOption>>;
+
+  @Input()
+  @coerceBoolean()
+  allowUserValue = false;
+
+  get itemsControl(): AbstractControl {
+    return this.stringItemsForm.get('items');
+  }
+
+  get itemControl(): AbstractControl {
+    return this.stringItemsForm.get('item');
+  }
+
+  private onTouched = () => {};
+  private propagateChange: (value: any) => void = () => {};
+  private dirty = false;
 
   constructor(private fb: FormBuilder) {
     this.stringItemsForm = this.fb.group({
-      items: [null, this.required ? [Validators.required] : []]
+      item: [null],
+      items: [null]
     });
   }
 
+  ngOnInit() {
+    if (this.predefinedValues || isDefined(this.fetchOptionsFn)) {
+      this.filteredValues = this.itemControl.valueChanges
+        .pipe(
+          tap((value) => {
+            if (value && typeof value !== 'string') {
+              this.add(value);
+            } else if (value === null) {
+              this.clear();
+            }
+          }),
+          filter((value) => typeof value === 'string'),
+          tap(name => this.searchText = name),
+          mergeMap(name => this.fetchOptionsFn ? this.fetchOptionsFn(name) : this.fetchValues(name)),
+          share()
+        );
+    }
+  }
+
   updateValidators() {
-    this.stringItemsForm.get('items').setValidators(this.required ? [Validators.required] : []);
-    this.stringItemsForm.get('items').updateValueAndValidity();
+    this.itemsControl.setValidators(this.required ? [Validators.required] : []);
+    this.itemsControl.updateValueAndValidity();
   }
 
   registerOnChange(fn: any): void {
@@ -100,6 +172,7 @@ export class StringItemsListComponent implements ControlValueAccessor{
   }
 
   registerOnTouched(fn: any): void {
+    this.onTouched = fn;
   }
 
   setDisabledState(isDisabled: boolean): void {
@@ -112,48 +185,117 @@ export class StringItemsListComponent implements ControlValueAccessor{
   }
 
   writeValue(value: Array<string> | null): void {
+    this.searchText = '';
     if (value != null && value.length > 0) {
       this.modelValue = [...value];
-      this.stringItemsForm.get('items').setValue(value);
+      this.itemList = [];
+      if (this.predefinedValues && !this.allowUserValue) {
+        value.forEach(item => {
+          const findItem = this.predefinedValues.find(option => option.value === item);
+          if (findItem) {
+            this.itemList.push(findItem);
+          }
+        });
+      } else {
+        value.forEach(item => this.itemList.push({value: item, name: item}));
+      }
+      this.itemsControl.setValue(this.itemList, {emitEvents: false});
     } else {
-      this.stringItemsForm.get('items').setValue(null);
+      this.itemsControl.setValue(null, {emitEvents: false});
       this.modelValue = null;
+      this.itemList = [];
     }
+    this.dirty = true;
   }
 
-  addItem(event: MatChipInputEvent): void {
-    let item = event.value || '';
-    const input = event.chipInput.inputElement;
-    item = item.trim();
-    if (item) {
-      if (!this.modelValue || this.modelValue.indexOf(item) === -1) {
-        if (!this.modelValue) {
-          this.modelValue = [];
-        }
-        this.modelValue.push(item);
-        this.stringItemsForm.get('items').setValue(this.modelValue);
-      }
-      this.propagateChange(this.modelValue);
-      if (input) {
-        input.value = '';
-      }
+  addOnBlur(event: FocusEvent) {
+    const target: HTMLElement = event.relatedTarget as HTMLElement;
+    if (target && target.tagName !== 'MAT-OPTION') {
+      this.addItem(this.stringItemInput.nativeElement.value ?? '')
     }
+    this.onTouched();
   }
 
-  removeItems(item: string) {
-    const index = this.modelValue.indexOf(item);
+  addOnEnd(event: MatChipInputEvent): void {
+    this.addItem(event.value ?? '')
+  }
+
+  removeItems(item: StringItemsOption) {
+    const index = this.modelValue.indexOf(item.value);
     if (index >= 0) {
       this.modelValue.splice(index, 1);
+      this.itemList.splice(index, 1);
       if (!this.modelValue.length) {
         this.modelValue = null;
       }
-      this.stringItemsForm.get('items').setValue(this.modelValue);
+      this.itemsControl.setValue(this.itemList);
       this.propagateChange(this.modelValue);
+      this.autocomplete?.closePanel();
     }
   }
 
-  get stringItemsList(): string[] {
-    return this.stringItemsForm.get('items').value;
+  onFocus() {
+    if (this.dirty) {
+      this.itemControl.updateValueAndValidity({onlySelf: true, emitEvent: true});
+      this.dirty = false;
+    }
   }
 
+  displayValueFn(values?: StringItemsOption): string | undefined {
+    return values ? values.name : undefined;
+  }
+
+  private addItem(searchText: string) {
+    searchText = searchText.trim();
+    if (searchText) {
+      if (this.allowUserValue || !this.predefinedValues && isUndefined(this.fetchOptionsFn)) {
+        this.add({value: searchText, name: searchText});
+      } else if (this.predefinedValues) {
+        const findItems = this.predefinedValues
+          .filter(value => value.name.toLowerCase().includes(searchText.toLowerCase()));
+        if (findItems.length === 1) {
+          this.add(findItems[0]);
+        }
+      } else if (isDefined(this.fetchOptionsFn)) {
+        this.fetchOptionsFn(searchText).subscribe((findItems) => {
+          if (findItems.length === 1) {
+            this.add(findItems[0]);
+          }
+        })
+      }
+    }
+  }
+
+  private add(item: StringItemsOption) {
+    if (!this.modelValue || this.modelValue.indexOf(item.value) === -1) {
+      if (!this.modelValue) {
+        this.modelValue = [];
+      }
+      this.modelValue.push(item.value);
+      this.itemList.push(item);
+      this.itemsControl.setValue(this.itemList);
+    }
+    this.propagateChange(this.modelValue);
+    this.clear();
+  }
+
+  private fetchValues(searchText?: string): Observable<Array<StringItemsOption>> {
+    if (!this.predefinedValues?.length) {
+      return of([]);
+    }
+    let result = this.predefinedValues;
+    if (searchText && searchText.length) {
+      result = this.predefinedValues.filter(option => option.name.toLowerCase().includes(searchText.toLowerCase()));
+    }
+    return of(result);
+  }
+
+  private clear(value: string = '') {
+    this.stringItemInput.nativeElement.value = value;
+    this.itemControl.patchValue(value, {emitEvent: true});
+    setTimeout(() => {
+      this.stringItemInput.nativeElement.blur();
+      this.stringItemInput.nativeElement.focus();
+    }, 0);
+  }
 }

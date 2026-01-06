@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -18,10 +18,18 @@ import {
   CellActionDescriptorType,
   DateEntityTableColumn,
   EntityActionTableColumn,
+  EntityLinkTableColumn,
   EntityTableColumn,
   EntityTableConfig
 } from '@home/models/entity/entities-table-config.models';
-import { DebugEventType, Event, EventType, FilterEventBody } from '@shared/models/event.models';
+import {
+  DebugEventType,
+  Event as DebugEvent,
+  Event,
+  EventBody,
+  EventType,
+  FilterEventBody
+} from '@shared/models/event.models';
 import { TimePageLink } from '@shared/models/page/page-link';
 import { TranslateService } from '@ngx-translate/core';
 import { DatePipe } from '@angular/common';
@@ -29,8 +37,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { EntityId } from '@shared/models/id/entity-id';
 import { EventService } from '@app/core/http/event.service';
 import { EventTableHeaderComponent } from '@home/components/event/event-table-header.component';
-import { EntityTypeResource } from '@shared/models/entity-type.models';
-import { Observable } from 'rxjs';
+import { EntityType, EntityTypeResource } from '@shared/models/entity-type.models';
+import { fromEvent, Observable } from 'rxjs';
 import { PageData } from '@shared/models/page/page-data';
 import { Direction } from '@shared/models/page/sort-order';
 import { DialogService } from '@core/services/dialog.service';
@@ -39,10 +47,10 @@ import {
   EventContentDialogComponent,
   EventContentDialogData
 } from '@home/components/event/event-content-dialog.component';
-import { isEqual, sortObjectKeys } from '@core/utils';
-import { historyInterval, MINUTE } from '@shared/models/time/time.models';
-import { ConnectedPosition, Overlay, OverlayConfig, OverlayRef } from '@angular/cdk/overlay';
-import { ChangeDetectorRef, Injector, StaticProvider, ViewContainerRef } from '@angular/core';
+import { getEntityDetailsPageURL, isEqual, sortObjectKeys } from '@core/utils';
+import { DAY, historyInterval, MINUTE } from '@shared/models/time/time.models';
+import { Overlay, OverlayConfig, OverlayRef } from '@angular/cdk/overlay';
+import { ChangeDetectorRef, EventEmitter, Injector, StaticProvider, ViewContainerRef } from '@angular/core';
 import { ComponentPortal } from '@angular/cdk/portal';
 import {
   EVENT_FILTER_PANEL_DATA,
@@ -50,18 +58,23 @@ import {
   EventFilterPanelData,
   FilterEntityColumn
 } from '@home/components/event/event-filter-panel.component';
+import { DEFAULT_OVERLAY_POSITIONS } from '@shared/models/overlay.models';
+import { getCurrentAuthState } from '@core/auth/auth.selectors';
+import { Store } from '@ngrx/store';
+import { AppState } from '@core/core.state';
 
 export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
 
   eventTypeValue: EventType | DebugEventType;
-  hideClearEventAction = false;
 
   private filterParams: FilterEventBody = {};
   private filterColumns: FilterEntityColumn[] = [];
+  private readonly maxDebugModeDurationMinutes = getCurrentAuthState(this.store).maxDebugModeDurationMinutes;
 
   set eventType(eventType: EventType | DebugEventType) {
     if (this.eventTypeValue !== eventType) {
       this.eventTypeValue = eventType;
+      this.updateCellAction();
       this.updateColumns(true);
       this.updateFilterColumns();
     }
@@ -85,12 +98,18 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
               private debugEventTypes: Array<DebugEventType> = null,
               private overlay: Overlay,
               private viewContainerRef: ViewContainerRef,
-              private cd: ChangeDetectorRef) {
+              private cd: ChangeDetectorRef,
+              private store: Store<AppState>,
+              public testButtonLabel?: string,
+              private debugEventSelected?: EventEmitter<EventBody>,
+              public hideClearEventAction = false,
+              public disableDebugEventAction = false) {
     super();
     this.loadDataOnInit = false;
     this.tableTitle = '';
     this.useTimePageLink = true;
-    this.defaultTimewindowInterval = historyInterval(MINUTE * 15);
+    const defaultInterval = this.maxDebugModeDurationMinutes ? Math.min(this.maxDebugModeDurationMinutes * MINUTE, DAY) : DAY;
+    this.defaultTimewindowInterval = historyInterval(defaultInterval);
     this.detailsPanelEnabled = false;
     this.selectionEnabled = false;
     this.searchEnabled = false;
@@ -122,12 +141,12 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
     this.defaultSortOrder = {property: 'createdTime', direction: Direction.DESC};
 
     this.updateColumns();
+    this.updateCellAction();
     this.updateFilterColumns();
 
     this.headerActionDescriptors.push({
       name: this.translate.instant('event.clear-filter'),
       icon: 'mdi:filter-variant-remove',
-      isMdiIcon: true,
       isEnabled: () => !isEqual(this.filterParams, {}),
       onAction: ($event) => {
         this.clearFiter($event);
@@ -289,7 +308,7 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
               padding: '0 12px 0 0'
             }),
             entity => entity.body.msgType),
-          new EntityTableColumn<Event>('relationType', 'event.relation-type', '70px',
+          new EntityTableColumn<Event>('relationType', 'event.relation-type', '85px',
             (entity) => entity.body.relationType, () => ({padding: '0 12px 0 0'}), false, () => ({
               padding: '0 12px 0 0'
             })),
@@ -345,10 +364,120 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
             '48px')
         );
         break;
+      case DebugEventType.DEBUG_CALCULATED_FIELD:
+        this.columns[0].width = '80px';
+        this.columns[1].width = '100px';
+        this.columns.push(
+          new EntityLinkTableColumn<Event>('entityId', 'event.entity-id', '100px',
+            (entity) => `<span style="display: inline-block; width: 9ch">${entity.body.entityId.substring(0, 8)}…</span>`,
+            (entity) => getEntityDetailsPageURL(entity.body.entityId, entity.body.entityType as EntityType),
+            false,
+            () => ({padding: '0 12px 0 0'}),
+            () => ({padding: '0 12px 0 0'}),
+            (entity) => entity.body.entityId,
+            {
+              name: this.translate.instant('event.copy-entity-id'),
+              icon: 'content_copy',
+              style: {
+                padding: '4px',
+                'font-size': '16px',
+                color: 'rgba(0,0,0,.87)'
+              },
+              isEnabled: () => true,
+              onAction: ($event, entity) => entity.body.entityId,
+              type: CellActionDescriptorType.COPY_BUTTON
+            }
+          ),
+          new EntityTableColumn<Event>('messageId', 'event.message-id', '100px',
+            (entity) => entity.body.msgId ? `<span style="display: inline-block; width: 9ch">${entity.body.msgId?.substring(0, 8)}…</span>` : '-',
+            () => ({padding: '0 12px 0 0'}),
+            false,
+            () => ({padding: '0 12px 0 0'}),
+            (entity) => entity.body.msgId,
+            false,
+            {
+              name: this.translate.instant('event.copy-message-id'),
+              icon: 'content_copy',
+              style: {
+                padding: '4px',
+                'font-size': '16px',
+                color: 'rgba(0,0,0,.87)'
+              },
+              isEnabled: (entity) => !!entity.body.msgId,
+              onAction: (_, entity) => entity.body.msgId,
+              type: CellActionDescriptorType.COPY_BUTTON
+            }
+          ),
+          new EntityTableColumn<Event>('messageType', 'event.message-type', '100px',
+            (entity) => entity.body.msgType ?? '-',
+            () => ({padding: '0 12px 0 0'}),
+            false,
+            () => ({padding: '0 12px 0 0'}),
+            (entity) => entity.body.msgType,
+          ),
+          new EntityActionTableColumn<Event>('arguments', 'event.arguments',
+            {
+              name: this.translate.instant('action.view'),
+              icon: 'more_horiz',
+              isEnabled: (entity) => entity.body.arguments !== undefined,
+              onAction: ($event, entity) => this.showContent($event, entity.body.arguments,
+                'event.arguments', ContentType.JSON, true)
+            },
+            '48px'
+          ),
+          new EntityActionTableColumn<Event>('result', 'event.result',
+            {
+              name: this.translate.instant('action.view'),
+              icon: 'more_horiz',
+              isEnabled: (entity) => entity.body.result !== undefined,
+              onAction: ($event, entity) => this.showContent($event, entity.body.result,
+                'event.result', ContentType.JSON, true)
+            },
+            '48px'
+          ),
+          new EntityActionTableColumn<Event>('error', 'event.error',
+            {
+              name: this.translate.instant('action.view'),
+              icon: 'more_horiz',
+              isEnabled: (entity) => entity.body.error && entity.body.error.length > 0,
+              onAction: ($event, entity) => this.showContent($event, entity.body.error,
+                'event.error')
+            },
+            '48px'
+          )
+        );
+        break;
     }
     if (updateTableColumns) {
       this.getTable().columnsUpdated(true);
     }
+  }
+
+  updateCellAction() {
+    this.cellActionDescriptors = [];
+    switch (this.eventType) {
+      case DebugEventType.DEBUG_RULE_NODE:
+        if (this.testButtonLabel) {
+          this.cellActionDescriptors.push({
+            name: this.translate.instant('rulenode.test-with-this-message', {test: this.translate.instant(this.testButtonLabel)}),
+            icon: 'bug_report',
+            isEnabled: (entity) => (entity.body.type === 'IN' || entity.body.error !== undefined) && !this.disableDebugEventAction,
+            onAction: ($event, entity) => {
+              this.debugEventSelected.next(entity.body);
+            }
+          });
+        }
+        break;
+      case DebugEventType.DEBUG_CALCULATED_FIELD:
+        this.cellActionDescriptors.push({
+          name: this.translate.instant('calculated-fields.test-with-this-message'),
+          icon: 'bug_report',
+          isEnabled: (event) => !this.disableDebugEventAction && !!(event as DebugEvent).body.arguments,
+          onAction: (_, entity) => this.debugEventSelected.next(entity.body)
+        });
+        break;
+    }
+    this.getTable()?.cellActionDescriptorsUpdated();
   }
 
   showContent($event: MouseEvent, content: string, title: string, contentType: ContentType = null, sortKeys = false): void {
@@ -357,7 +486,12 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
     }
     if (contentType === ContentType.JSON && sortKeys) {
       try {
-        content = JSON.stringify(sortObjectKeys(JSON.parse(content)));
+        const parsedContent = JSON.parse(content);
+        if (Array.isArray(parsedContent)) {
+          content = JSON.stringify(parsedContent.map(item => item && typeof item === 'object' ? sortObjectKeys(item) : item));
+        } else {
+          content = JSON.stringify(sortObjectKeys(parsedContent));
+        }
       } catch (e) {}
     }
     this.dialog.open<EventContentDialogComponent, EventContentDialogData>(EventContentDialogComponent, {
@@ -417,6 +551,17 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
           {key: 'errorStr', title: 'event.error'}
         );
         break;
+      case DebugEventType.DEBUG_CALCULATED_FIELD:
+        this.filterColumns.push(
+          {key: 'entityId', title: 'event.entity-id'},
+          {key: 'msgId', title: 'event.message-id'},
+          {key: 'msgType', title: 'event.message-type'},
+          {key: 'arguments', title: 'event.arguments'},
+          {key: 'result', title: 'event.result'},
+          {key: 'isError', title: 'event.error'},
+          {key: 'errorStr', title: 'event.error'}
+        );
+        break;
     }
   }
 
@@ -434,20 +579,17 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
     if ($event) {
       $event.stopPropagation();
     }
-    const target = $event.target || $event.srcElement || $event.currentTarget;
-    const config = new OverlayConfig();
-    config.backdropClass = 'cdk-overlay-transparent-backdrop';
-    config.hasBackdrop = true;
-    const connectedPosition: ConnectedPosition = {
-      originX: 'end',
-      originY: 'bottom',
-      overlayX: 'end',
-      overlayY: 'top'
-    };
-    config.positionStrategy = this.overlay.position().flexibleConnectedTo(target as HTMLElement)
-      .withPositions([connectedPosition]);
-    config.maxHeight = '70vh';
-    config.height = 'min-content';
+    const target = $event.target || $event.currentTarget;
+    const config = new OverlayConfig({
+      panelClass: 'tb-panel-container',
+      backdropClass: 'cdk-overlay-transparent-backdrop',
+      hasBackdrop: true,
+      height: 'fit-content',
+      maxHeight: '65vh'
+    });
+    config.positionStrategy = this.overlay.position()
+      .flexibleConnectedTo(target as HTMLElement)
+      .withPositions(DEFAULT_OVERLAY_POSITIONS);
 
     const overlayRef = this.overlay.create(config);
     overlayRef.backdropClick().subscribe(() => {
@@ -469,7 +611,11 @@ export class EventTableConfig extends EntityTableConfig<Event, TimePageLink> {
     const injector = Injector.create({parent: this.viewContainerRef.injector, providers});
     const componentRef = overlayRef.attach(new ComponentPortal(EventFilterPanelComponent,
       this.viewContainerRef, injector));
+    const resizeWindows$ = fromEvent(window, 'resize').subscribe(() => {
+      overlayRef.updatePosition();
+    });
     componentRef.onDestroy(() => {
+      resizeWindows$.unsubscribe();
       if (componentRef.instance.result && !isEqual(this.filterParams, componentRef.instance.result.filterParams)) {
         this.filterParams = componentRef.instance.result.filterParams;
         this.getTable().paginator.pageIndex = 0;

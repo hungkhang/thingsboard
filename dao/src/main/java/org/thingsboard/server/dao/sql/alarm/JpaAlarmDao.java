@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,19 @@
 package org.thingsboard.server.dao.sql.alarm;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.thingsboard.common.util.JacksonUtil;
+import org.thingsboard.server.common.data.EntitySubtype;
 import org.thingsboard.server.common.data.EntityType;
 import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.alarm.Alarm;
@@ -46,10 +51,14 @@ import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.common.data.id.UserId;
 import org.thingsboard.server.common.data.page.PageData;
 import org.thingsboard.server.common.data.page.PageLink;
+import org.thingsboard.server.common.data.page.SortOrder;
 import org.thingsboard.server.common.data.query.AlarmCountQuery;
 import org.thingsboard.server.common.data.query.AlarmData;
 import org.thingsboard.server.common.data.query.AlarmDataQuery;
+import org.thingsboard.server.common.data.query.OriginatorAlarmFilter;
+import org.thingsboard.server.common.data.util.TbPair;
 import org.thingsboard.server.dao.DaoUtil;
+import org.thingsboard.server.dao.TenantEntityDao;
 import org.thingsboard.server.dao.alarm.AlarmDao;
 import org.thingsboard.server.dao.model.ModelConstants;
 import org.thingsboard.server.dao.model.sql.AlarmEntity;
@@ -67,13 +76,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Created by Valerii Sosliuk on 5/19/2017.
- */
+import static org.thingsboard.server.common.data.page.SortOrder.Direction.ASC;
+import static org.thingsboard.server.dao.DaoUtil.convertTenantEntityTypesToDto;
+import static org.thingsboard.server.dao.DaoUtil.toPageable;
+
 @Slf4j
 @Component
 @SqlDao
-public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements AlarmDao {
+public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements AlarmDao, TenantEntityDao<Alarm> {
 
     @Autowired
     private AlarmRepository alarmRepository;
@@ -113,6 +123,11 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
     }
 
     @Override
+    public FluentFuture<Alarm> findLatestActiveByOriginatorAndTypeAsync(TenantId tenantId, EntityId originator, String type) {
+        return FluentFuture.from(service.submit(() -> findLatestActiveByOriginatorAndType(tenantId, originator, type)));
+    }
+
+    @Override
     public ListenableFuture<Alarm> findLatestByOriginatorAndTypeAsync(TenantId tenantId, EntityId originator, String type) {
         return service.submit(() -> findLatestByOriginatorAndType(tenantId, originator, type));
     }
@@ -149,8 +164,8 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                             asf.hasClearFilter() && asf.getClearFilter(),
                             asf.hasAckFilter(),
                             asf.hasAckFilter() && asf.getAckFilter(),
-                            DaoUtil.getStringId(query.getAssigneeId()),
-                            Objects.toString(query.getPageLink().getTextSearch(), ""),
+                            DaoUtil.getId(query.getAssigneeId()),
+                            query.getPageLink().getTextSearch(),
                             DaoUtil.toPageable(query.getPageLink())
                     )
             );
@@ -164,8 +179,8 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                             asf.hasClearFilter() && asf.getClearFilter(),
                             asf.hasAckFilter(),
                             asf.hasAckFilter() && asf.getAckFilter(),
-                            DaoUtil.getStringId(query.getAssigneeId()),
-                            Objects.toString(query.getPageLink().getTextSearch(), ""),
+                            DaoUtil.getId(query.getAssigneeId()),
+                            query.getPageLink().getTextSearch(),
                             DaoUtil.toPageable(query.getPageLink())
                     )
             );
@@ -186,8 +201,8 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                         asf.hasClearFilter() && asf.getClearFilter(),
                         asf.hasAckFilter(),
                         asf.hasAckFilter() && asf.getAckFilter(),
-                        DaoUtil.getStringId(query.getAssigneeId()),
-                        Objects.toString(query.getPageLink().getTextSearch(), ""),
+                        DaoUtil.getId(query.getAssigneeId()),
+                        query.getPageLink().getTextSearch(),
                         DaoUtil.toPageable(query.getPageLink())
                 )
         );
@@ -214,8 +229,8 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                             asf.hasClearFilter() && asf.getClearFilter(),
                             asf.hasAckFilter(),
                             asf.hasAckFilter() && asf.getAckFilter(),
-                            DaoUtil.getStringId(query.getAssigneeId()),
-                            Objects.toString(query.getPageLink().getTextSearch(), ""),
+                            DaoUtil.getId(query.getAssigneeId()),
+                            query.getPageLink().getTextSearch(),
                             DaoUtil.toPageable(query.getPageLink())
                     )
             );
@@ -231,8 +246,8 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                             asf.hasClearFilter() && asf.getClearFilter(),
                             asf.hasAckFilter(),
                             asf.hasAckFilter() && asf.getAckFilter(),
-                            DaoUtil.getStringId(query.getAssigneeId()),
-                            Objects.toString(query.getPageLink().getTextSearch(), ""),
+                            DaoUtil.getId(query.getAssigneeId()),
+                            query.getPageLink().getTextSearch(),
                             DaoUtil.toPageable(query.getPageLink())
                     )
             );
@@ -257,8 +272,8 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                         asf.hasClearFilter() && asf.getClearFilter(),
                         asf.hasAckFilter(),
                         asf.hasAckFilter() && asf.getAckFilter(),
-                        DaoUtil.getStringId(query.getAssigneeId()),
-                        Objects.toString(query.getPageLink().getTextSearch(), ""),
+                        DaoUtil.getId(query.getAssigneeId()),
+                        query.getPageLink().getTextSearch(),
                         DaoUtil.toPageable(query.getPageLink())
                 )
         );
@@ -276,13 +291,37 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
                 asf.hasClearFilter() && asf.getClearFilter(),
                 asf.hasAckFilter(),
                 asf.hasAckFilter() && asf.getAckFilter(),
-                assigneeId);
+                StringUtils.isNotBlank(assigneeId) ? UUID.fromString(assigneeId) : null);
     }
 
     @Override
     public PageData<AlarmId> findAlarmsIdsByEndTsBeforeAndTenantId(Long time, TenantId tenantId, PageLink pageLink) {
         return DaoUtil.pageToPageData(alarmRepository.findAlarmsIdsByEndTsBeforeAndTenantId(time, tenantId.getId(), DaoUtil.toPageable(pageLink)))
                 .mapData(AlarmId::new);
+    }
+
+    @Override
+    public PageData<TbPair<UUID, Long>> findAlarmIdsByAssigneeId(TenantId tenantId, UserId userId, long createdTimeOffset, AlarmId idOffset, int limit) {
+        Slice<TbPair<UUID, Long>> result;
+        Pageable pageRequest = toPageable(new PageLink(limit), List.of(SortOrder.of("createdTime", ASC), SortOrder.of("id", ASC)));
+        if (idOffset == null) {
+            result = alarmRepository.findAlarmIdsByAssigneeId(tenantId.getId(), userId.getId(), pageRequest);
+        } else {
+            result = alarmRepository.findAlarmIdsByAssigneeId(tenantId.getId(), userId.getId(), createdTimeOffset, idOffset.getId(), pageRequest);
+        }
+        return DaoUtil.pageToPageData(result);
+    }
+
+    @Override
+    public PageData<TbPair<UUID, Long>> findAlarmIdsByOriginatorId(TenantId tenantId, EntityId originatorId, long createdTimeOffset, AlarmId idOffset, int limit) {
+        Slice<TbPair<UUID, Long>> result;
+        Pageable pageRequest = toPageable(new PageLink(limit), List.of(SortOrder.of("createdTime", ASC), SortOrder.of("id", ASC)));
+        if (idOffset == null) {
+            result = alarmRepository.findAlarmIdsByOriginatorId(originatorId.getId(), pageRequest);
+        } else {
+            result = alarmRepository.findAlarmIdsByOriginatorId(originatorId.getId(), createdTimeOffset, idOffset.getId(), pageRequest);
+        }
+        return DaoUtil.pageToPageData(result);
     }
 
     @Override
@@ -298,16 +337,28 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
     }
 
     @Override
-    public void deleteEntityAlarmRecords(TenantId tenantId, EntityId entityId) {
-        log.trace("[{}] Try to delete entity alarm records using [{}]", tenantId, entityId);
-        entityAlarmRepository.deleteByEntityId(entityId.getId());
+    public List<EntityAlarm> findEntityAlarmRecordsByEntityId(TenantId tenantId, EntityId entityId) {
+        return DaoUtil.convertDataList(entityAlarmRepository.findAllByEntityId(entityId.getId()));
+    }
+
+    @Override
+    public int deleteEntityAlarmRecords(TenantId tenantId, EntityId entityId) {
+        return entityAlarmRepository.deleteByEntityId(entityId.getId());
+    }
+
+    @Override
+    public void deleteEntityAlarmRecordsByTenantId(TenantId tenantId) {
+        entityAlarmRepository.deleteByTenantId(tenantId.getId());
     }
 
     @Override
     public AlarmApiCallResult createOrUpdateActiveAlarm(AlarmCreateOrUpdateActiveRequest request, boolean alarmCreationEnabled) {
+        UUID tenantUUID = request.getTenantId().getId();
+        log.debug("[{}] createOrUpdateActiveAlarm [{}] {}", tenantUUID, alarmCreationEnabled, request);
+
         AlarmPropagationInfo ap = getSafePropagationInfo(request.getPropagation());
         return toAlarmApiResult(alarmRepository.createOrUpdateActiveAlarm(
-                request.getTenantId().getId(),
+                tenantUUID,
                 request.getCustomerId() != null ? request.getCustomerId().getId() : CustomerId.NULL_UUID,
                 request.getEdgeAlarmId() != null ? request.getEdgeAlarmId().getId() : UUID.randomUUID(),
                 System.currentTimeMillis(),
@@ -327,10 +378,14 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
 
     @Override
     public AlarmApiCallResult updateAlarm(AlarmUpdateRequest request) {
+        UUID tenantUUID = request.getTenantId().getId();
+        UUID alarmUUID = request.getAlarmId().getId();
+        log.debug("[{}][{}] updateAlarm {}", tenantUUID, alarmUUID, request);
+
         AlarmPropagationInfo ap = getSafePropagationInfo(request.getPropagation());
         return toAlarmApiResult(alarmRepository.updateAlarm(
-                request.getTenantId().getId(),
-                request.getAlarmId().getId(),
+                tenantUUID,
+                alarmUUID,
                 request.getSeverity().name(),
                 request.getStartTs(), request.getEndTs(),
                 getDetailsAsString(request.getDetails()),
@@ -343,11 +398,13 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
 
     @Override
     public AlarmApiCallResult acknowledgeAlarm(TenantId tenantId, AlarmId id, long ackTs) {
+        log.debug("[{}][{}] acknowledgeAlarm [{}]", tenantId, id, ackTs);
         return toAlarmApiResult(alarmRepository.acknowledgeAlarm(tenantId.getId(), id.getId(), ackTs));
     }
 
     @Override
     public AlarmApiCallResult clearAlarm(TenantId tenantId, AlarmId id, long clearTs, JsonNode details) {
+        log.debug("[{}][{}] clearAlarm [{}]", tenantId, id, clearTs);
         return toAlarmApiResult(alarmRepository.clearAlarm(tenantId.getId(), id.getId(), clearTs, details != null ? getDetailsAsString(details) : null));
     }
 
@@ -362,8 +419,31 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
     }
 
     @Override
-    public long countAlarmsByQuery(TenantId tenantId, CustomerId customerId, AlarmCountQuery query) {
-        return alarmQueryRepository.countAlarmsByQuery(tenantId, customerId, query);
+    public long countAlarmsByQuery(TenantId tenantId, CustomerId customerId, AlarmCountQuery query, Collection<EntityId> orderedEntityIds) {
+        return alarmQueryRepository.countAlarmsByQuery(tenantId, customerId, query, orderedEntityIds);
+    }
+
+    @Override
+    public PageData<EntitySubtype> findTenantAlarmTypes(UUID tenantId, PageLink pageLink) {
+        Page<String> page = alarmRepository.findTenantAlarmTypes(tenantId, Objects.toString(pageLink.getTextSearch(), ""), toPageable(pageLink, false));
+        if (page.isEmpty()) {
+            return PageData.emptyPageData();
+        }
+
+        List<EntitySubtype> data = convertTenantEntityTypesToDto(tenantId, EntityType.ALARM, page.getContent());
+        return new PageData<>(data, page.getTotalPages(), page.getTotalElements(), page.hasNext());
+    }
+
+    @Override
+    public boolean removeAlarmTypesIfNoAlarmsPresent(UUID tenantId, Set<String> types) {
+        return alarmRepository.deleteTypeIfNoAlarmsExist(tenantId, types) > 0;
+    }
+
+    @Override
+    public List<UUID> findActiveOriginatorAlarms(TenantId tenantId, OriginatorAlarmFilter filter, int limit) {
+        return alarmRepository.findActiveOriginatorAlarms(filter.getOriginatorId().getId(),
+                filter.getTypeList(), filter.getSeverityList() != null ? filter.getSeverityList().stream().map(Enum::name).toList() : null,
+                limit);
     }
 
     private static String getPropagationTypes(AlarmPropagationInfo ap) {
@@ -473,6 +553,11 @@ public class JpaAlarmDao extends JpaAbstractDao<AlarmEntity, Alarm> implements A
         } else {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public PageData<Alarm> findAllByTenantId(TenantId tenantId, PageLink pageLink) {
+        return DaoUtil.toPageData(alarmRepository.findByTenantId(tenantId.getId(), DaoUtil.toPageable(pageLink)));
     }
 
     @Override

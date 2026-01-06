@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package org.thingsboard.server.service.update;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,20 +26,22 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.thingsboard.common.util.ThingsBoardThreadFactory;
+import org.thingsboard.common.util.JacksonUtil;
+import org.thingsboard.common.util.ThingsBoardExecutors;
+import org.thingsboard.server.common.data.EdgeUpgradeMessage;
 import org.thingsboard.server.common.data.UpdateMessage;
-import org.thingsboard.server.common.msg.notification.trigger.NewPlatformVersionTrigger;
-import org.thingsboard.server.queue.notification.NotificationRuleProcessor;
+import org.thingsboard.server.common.data.notification.rule.trigger.NewPlatformVersionTrigger;
+import org.thingsboard.server.common.msg.notification.NotificationRuleProcessor;
 import org.thingsboard.server.queue.util.AfterStartUp;
 import org.thingsboard.server.queue.util.TbCoreComponent;
+import org.thingsboard.server.service.edge.instructions.EdgeInstallInstructionsService;
+import org.thingsboard.server.service.edge.instructions.EdgeUpgradeInstructionsService;
 
-import javax.annotation.PreDestroy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -65,7 +67,13 @@ public class DefaultUpdateService implements UpdateService {
     @Autowired
     private NotificationRuleProcessor notificationRuleProcessor;
 
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, ThingsBoardThreadFactory.forName("tb-update-service"));
+    @Autowired(required = false)
+    private EdgeInstallInstructionsService edgeInstallInstructionsService;
+
+    @Autowired(required = false)
+    private EdgeUpgradeInstructionsService edgeUpgradeInstructionsService;
+
+    private final ScheduledExecutorService scheduler = ThingsBoardExecutors.newSingleThreadScheduledExecutor("tb-update-service");
 
     private ScheduledFuture<?> checkUpdatesFuture = null;
     private final RestTemplate restClient = new RestTemplate();
@@ -130,7 +138,7 @@ public class DefaultUpdateService implements UpdateService {
             log.trace("Executing check update method for instanceId [{}], platform [{}] and version [{}]", instanceId, platform, version);
             var headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            ObjectNode request = new ObjectMapper().createObjectNode();
+            ObjectNode request = JacksonUtil.newObjectNode();
             request.put(PLATFORM_PARAM, platform);
             request.put(VERSION_PARAM, version);
             request.put(INSTANCE_ID_PARAM, instanceId.toString());
@@ -141,6 +149,16 @@ public class DefaultUpdateService implements UpdateService {
                         .updateInfo(updateMessage)
                         .build());
             }
+            ObjectNode edgeRequest = JacksonUtil.newObjectNode().put(VERSION_PARAM, version);
+            String edgePlatformVersion = restClient.postForObject(UPDATE_SERVER_BASE_URL + "/api/v1/edge/installMapping", new HttpEntity<>(edgeRequest.toString(), headers), String.class);
+            if (edgePlatformVersion != null) {
+                edgeInstallInstructionsService.setPlatformEdgeVersion(edgePlatformVersion);
+                edgeUpgradeInstructionsService.setPlatformEdgeVersion(edgePlatformVersion);
+            }
+            EdgeUpgradeMessage edgeUpgradeMessage = restClient.postForObject(UPDATE_SERVER_BASE_URL + "/api/v1/edge/upgradeMapping", new HttpEntity<>(edgeRequest.toString(), headers), EdgeUpgradeMessage.class);
+            if (edgeUpgradeMessage != null) {
+                edgeUpgradeInstructionsService.updateInstructionMap(edgeUpgradeMessage.getEdgeVersions());
+            }
         } catch (Exception e) {
             log.trace(e.getMessage());
         }
@@ -150,5 +168,4 @@ public class DefaultUpdateService implements UpdateService {
     public UpdateMessage checkUpdates() {
         return updateMessage;
     }
-
 }

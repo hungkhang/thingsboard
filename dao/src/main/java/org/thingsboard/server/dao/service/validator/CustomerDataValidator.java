@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,9 @@ import org.thingsboard.server.common.data.StringUtils;
 import org.thingsboard.server.common.data.id.TenantId;
 import org.thingsboard.server.dao.customer.CustomerDao;
 import org.thingsboard.server.dao.customer.CustomerServiceImpl;
-import org.thingsboard.server.dao.exception.DataValidationException;
+import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.dao.service.DataValidator;
 import org.thingsboard.server.dao.tenant.TenantService;
-
-import java.util.Optional;
 
 @Component
 public class CustomerDataValidator extends DataValidator<Customer> {
@@ -41,31 +39,20 @@ public class CustomerDataValidator extends DataValidator<Customer> {
     @Override
     protected void validateCreate(TenantId tenantId, Customer customer) {
         validateNumberOfEntitiesPerTenant(tenantId, EntityType.CUSTOMER);
-        customerDao.findCustomersByTenantIdAndTitle(customer.getTenantId().getId(), customer.getTitle()).ifPresent(
-                c -> {
-                    throw new DataValidationException("Customer with such title already exists!");
-                }
-        );
     }
 
     @Override
     protected Customer validateUpdate(TenantId tenantId, Customer customer) {
-        Optional<Customer> customerOpt = customerDao.findCustomersByTenantIdAndTitle(customer.getTenantId().getId(), customer.getTitle());
-        customerOpt.ifPresent(
-                c -> {
-                    if (!c.getId().equals(customer.getId())) {
-                        throw new DataValidationException("Customer with such title already exists!");
-                    }
-                }
-        );
-        return customerOpt.orElse(null);
+        Customer old = customerDao.findById(customer.getTenantId(), customer.getId().getId());
+        if (old == null) {
+            throw new DataValidationException("Can't update non existing customer!");
+        }
+        return old;
     }
 
     @Override
     protected void validateDataImpl(TenantId tenantId, Customer customer) {
-        if (StringUtils.isEmpty(customer.getTitle())) {
-            throw new DataValidationException("Customer title should be specified!");
-        }
+        validateString("Customer title", customer.getTitle());
         if (customer.getTitle().equals(CustomerServiceImpl.PUBLIC_CUSTOMER_TITLE)) {
             throw new DataValidationException("'Public' title for customer is system reserved!");
         }

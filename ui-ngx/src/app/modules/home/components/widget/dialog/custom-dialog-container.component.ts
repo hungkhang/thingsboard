@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import {
   Component,
-  ComponentFactory,
-  ComponentRef, HostBinding,
+  ComponentRef,
+  HostBinding,
   Inject,
   Injector,
   OnDestroy,
+  Type,
   ViewContainerRef
 } from '@angular/core';
 import { DialogComponent } from '@shared/components/dialog.component';
@@ -39,7 +40,7 @@ import { TranslateService } from '@ngx-translate/core';
 export interface CustomDialogContainerData {
   controller: (instance: CustomDialogComponent) => void;
   data?: any;
-  customComponentFactory: ComponentFactory<CustomDialogComponent>;
+  customComponentType: Type<CustomDialogComponent>;
 }
 
 @Component({
@@ -77,7 +78,8 @@ export class CustomDialogContainerComponent extends DialogComponent<CustomDialog
         }]
     });
     try {
-      this.customComponentRef = this.viewContainerRef.createComponent(this.data.customComponentFactory, 0, injector);
+      this.customComponentRef = this.viewContainerRef.createComponent(this.data.customComponentType,
+        {index: 0, injector});
     } catch (e: any) {
       let message;
       if (e.message?.startsWith('NG0')) {

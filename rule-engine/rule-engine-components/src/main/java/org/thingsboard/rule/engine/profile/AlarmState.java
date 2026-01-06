@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import org.thingsboard.server.common.data.device.profile.AlarmConditionSpecType;
 import org.thingsboard.server.common.data.device.profile.DeviceProfileAlarm;
 import org.thingsboard.server.common.data.id.DashboardId;
 import org.thingsboard.server.common.data.id.EntityId;
+import org.thingsboard.server.common.data.msg.TbMsgType;
 import org.thingsboard.server.common.msg.TbMsg;
 import org.thingsboard.server.common.msg.TbMsgMetaData;
 
@@ -47,6 +48,7 @@ import java.util.function.BiFunction;
 
 @Data
 @Slf4j
+@Deprecated
 class AlarmState {
 
     public static final String ERROR_MSG = "Failed to process alarm rule for Device [%s]: %s";
@@ -189,7 +191,7 @@ class AlarmState {
             metaData.putValue(DataConstants.IS_CLEARED_ALARM, Boolean.TRUE.toString());
         }
         setAlarmConditionMetadata(ruleState, metaData);
-        TbMsg newMsg = ctx.newMsg(lastMsgQueueName != null ? lastMsgQueueName : null, "ALARM",
+        TbMsg newMsg = ctx.newMsg(lastMsgQueueName != null ? lastMsgQueueName : null, TbMsgType.ALARM,
                 originator, msg != null ? msg.getCustomerId() : null, metaData, data);
         ctx.enqueueForTellNext(newMsg, relationType);
     }
@@ -243,27 +245,28 @@ class AlarmState {
                 return null;
             }
         } else {
-            currentAlarm = new Alarm();
-            currentAlarm.setType(alarmDefinition.getAlarmType());
-            currentAlarm.setAcknowledged(false);
-            currentAlarm.setCleared(false);
-            currentAlarm.setSeverity(severity);
+            var newAlarm = new Alarm();
+            newAlarm.setType(alarmDefinition.getAlarmType());
+            newAlarm.setAcknowledged(false);
+            newAlarm.setCleared(false);
+            newAlarm.setSeverity(severity);
             long startTs = dataSnapshot.getTs();
-            if (startTs == 0L) {
-                startTs = System.currentTimeMillis();
+            long currentTime = System.currentTimeMillis();
+            if (startTs == 0L || startTs > currentTime) {
+                startTs = currentTime;
             }
-            currentAlarm.setStartTs(startTs);
-            currentAlarm.setEndTs(currentAlarm.getStartTs());
-            currentAlarm.setDetails(createDetails(ruleState));
-            currentAlarm.setOriginator(originator);
-            currentAlarm.setTenantId(ctx.getTenantId());
-            currentAlarm.setPropagate(alarmDefinition.isPropagate());
-            currentAlarm.setPropagateToOwner(alarmDefinition.isPropagateToOwner());
-            currentAlarm.setPropagateToTenant(alarmDefinition.isPropagateToTenant());
+            newAlarm.setStartTs(startTs);
+            newAlarm.setEndTs(startTs);
+            newAlarm.setDetails(createDetails(ruleState));
+            newAlarm.setOriginator(originator);
+            newAlarm.setTenantId(ctx.getTenantId());
+            newAlarm.setPropagate(alarmDefinition.isPropagate());
+            newAlarm.setPropagateToOwner(alarmDefinition.isPropagateToOwner());
+            newAlarm.setPropagateToTenant(alarmDefinition.isPropagateToTenant());
             if (alarmDefinition.getPropagateRelationTypes() != null) {
-                currentAlarm.setPropagateRelationTypes(alarmDefinition.getPropagateRelationTypes());
+                newAlarm.setPropagateRelationTypes(alarmDefinition.getPropagateRelationTypes());
             }
-            AlarmApiCallResult result = ctx.getAlarmService().createAlarm(AlarmCreateOrUpdateActiveRequest.fromAlarm(currentAlarm));
+            AlarmApiCallResult result = ctx.getAlarmService().createAlarm(AlarmCreateOrUpdateActiveRequest.fromAlarm(newAlarm));
             currentAlarm = result.getAlarm();
             return TbAlarmResult.fromAlarmResult(result);
         }

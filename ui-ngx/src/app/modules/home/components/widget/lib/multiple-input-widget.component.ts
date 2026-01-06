@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -33,14 +33,13 @@ import {
   isUndefined
 } from '@core/utils';
 import { EntityType } from '@shared/models/entity-type.models';
-import * as _moment from 'moment';
+import _moment from 'moment';
 import { UntypedFormBuilder, UntypedFormGroup, ValidatorFn, Validators } from '@angular/forms';
 import { RequestConfig } from '@core/http/http-utils';
 import { AttributeService } from '@core/http/attribute.service';
 import { AttributeData, AttributeScope, LatestTelemetry } from '@shared/models/telemetry/telemetry.models';
 import { forkJoin, Observable, Subject } from 'rxjs';
 import { EntityId } from '@shared/models/id/entity-id';
-import { ResizeObserver } from '@juggle/resize-observer';
 import { takeUntil } from 'rxjs/operators';
 import {
   JsonObjectEditDialogComponent,
@@ -48,14 +47,15 @@ import {
 } from '@shared/components/dialog/json-object-edit-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
+import { MatFormFieldAppearance, SubscriptSizing } from '@angular/material/form-field';
 
 type FieldAlignment = 'row' | 'column';
 
 type MultipleInputWidgetDataKeyType = 'server' | 'shared' | 'timeseries';
 export type MultipleInputWidgetDataKeyValueType = 'string' | 'double' | 'integer' |
                                                   'JSON' | 'booleanCheckbox' | 'booleanSwitch' |
-                                                  'dateTime' | 'date' | 'time' | 'select';
-type MultipleInputWidgetDataKeyEditableType = 'editable' | 'disabled' | 'readonly';
+                                                  'dateTime' | 'date' | 'time' | 'select' | 'radio' | 'color';
+export type MultipleInputWidgetDataKeyEditableType = 'editable' | 'disabled' | 'readonly';
 
 type ConvertGetValueFunction = (value: any, ctx: WidgetContext) => any;
 type ConvertSetValueFunction = (value: any, originValue: any, ctx: WidgetContext) => any;
@@ -71,6 +71,8 @@ interface MultipleInputWidgetSettings {
   groupTitle: string;
   fieldsAlignment: FieldAlignment;
   fieldsInRow: number;
+  columnGap: number;
+  rowGap: number;
   attributesShared?: boolean;
 }
 
@@ -84,10 +86,15 @@ interface MultipleInputWidgetDataKeySettings {
   dataKeyValueType: MultipleInputWidgetDataKeyValueType;
   slideToggleLabelPosition?: 'after' | 'before';
   selectOptions: MultipleInputWidgetSelectOption[];
+  radioColor: string;
+  radioColumns: number;
+  radioLabelPosition?: 'after' | 'before';
   required: boolean;
   isEditable: MultipleInputWidgetDataKeyEditableType;
   disabledOnDataKey: string;
   dataKeyHidden: boolean;
+  appearance: MatFormFieldAppearance;
+  subscriptSizing: SubscriptSizing;
   step?: number;
   minValue?: number;
   maxValue?: number;
@@ -98,8 +105,8 @@ interface MultipleInputWidgetDataKeySettings {
   invalidJsonErrorMessage?: string;
   useCustomIcon: boolean;
   icon: string;
-  customIcon: string ;
-  safeCustomIcon?: SafeUrl;
+  customIcon: string;
+  customIconUrl?: string;
   inputTypeNumber?: boolean;
   readOnly?: boolean;
   disabledOnCondition?: boolean;
@@ -148,8 +155,7 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
   private isSavingInProgress = false;
 
   isVerticalAlignment: boolean;
-  inputWidthSettings: string;
-  changeAlignment: boolean;
+  columns: number;
   saveButtonLabel: string;
   resetButtonLabel: string;
 
@@ -186,7 +192,9 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
     this.buildForm();
     this.ctx.updateWidgetParams();
     this.formResize$ = new ResizeObserver(() => {
-      this.resize();
+      this.ngZone.run(() => {
+        this.resize();
+      });
     });
     this.formResize$.observe(this.formContainerRef.nativeElement);
   }
@@ -202,10 +210,7 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
   private initializeConfig() {
 
     if (this.settings.widgetTitle && this.settings.widgetTitle.length) {
-      const titlePatternText = this.utils.customTranslation(this.settings.widgetTitle, this.settings.widgetTitle);
-      this.ctx.widgetTitle = createLabelFromDatasource(this.datasources[0], titlePatternText);
-    } else {
-      this.ctx.widgetTitle = this.ctx.widgetConfig.title;
+      this.ctx.widgetTitle = this.settings.widgetTitle;
     }
 
     this.settings.groupTitle = this.settings.groupTitle || '${entityName}';
@@ -231,15 +236,15 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
     if (isUndefined(this.settings.fieldsInRow)) {
       this.settings.fieldsInRow = 2;
     }
-    // For backward compatibility
-
     this.isVerticalAlignment = !(this.settings.fieldsAlignment === 'row');
-
-    if (!this.isVerticalAlignment && this.settings.fieldsInRow) {
-      this.inputWidthSettings = 100 / this.settings.fieldsInRow + '%';
+    if (isUndefined(this.settings.columnGap)) {
+      this.settings.columnGap = 10;
+    }
+    if (isUndefined(this.settings.rowGap)) {
+      this.settings.rowGap = 5;
     }
 
-    this.updateWidgetDisplaying();
+    this.updateColumns();
   }
 
   private updateDatasources() {
@@ -287,9 +292,18 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
                 dataKey.settings.isEditable = 'editable';
               }
             }
+
+            if (isUndefined(dataKey.settings.appearance)) {
+              dataKey.settings.appearance = 'outline';
+            }
+
+            if (isUndefined(dataKey.settings.subscriptSizing)) {
+              dataKey.settings.subscriptSizing = 'fixed';
+            }
+
             // For backward compatibility
 
-            if (dataKey.settings.dataKeyValueType === 'select') {
+            if (dataKey.settings.dataKeyValueType === 'select' || dataKey.settings.dataKeyValueType === 'radio') {
               dataKey.settings.selectOptions.forEach((option) => {
                 if (option.value.toLowerCase() === 'null') {
                   option.value = null;
@@ -302,7 +316,7 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
             }
 
             if (dataKey.settings.useCustomIcon && isDefinedAndNotNull(dataKey.settings.customIcon)) {
-              dataKey.settings.safeCustomIcon = this.sanitizer.bypassSecurityTrustUrl(dataKey.settings.customIcon);
+              dataKey.settings.customIconUrl = dataKey.settings.customIcon;
             }
 
             if (dataKey.settings.useGetValueFunction && dataKey.settings.getValueFunctionBody.length) {
@@ -433,6 +447,7 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
               }
               break;
             case 'select':
+            case 'radio':
               value = keyValue !== null ? keyValue.toString() : null;
               break;
             case 'JSON':
@@ -449,9 +464,8 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
         }
 
         if (key.settings.isEditable === 'editable' && key.settings.disabledOnDataKey) {
-          const conditions = data.filter((item) => {
-            return source.datasource === item.datasource && item.dataKey.name === key.settings.disabledOnDataKey;
-          });
+          const conditions = data.filter((item) =>
+              source.datasource === item.datasource && item.dataKey.name === key.settings.disabledOnDataKey);
           if (conditions && conditions.length) {
             if (conditions[0].data.length) {
               if (conditions[0].data[0][1] === 'false') {
@@ -491,8 +505,17 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
     return data;
   }
 
-  private updateWidgetDisplaying() {
-    this.changeAlignment = (this.ctx.$container && this.ctx.$container[0].offsetWidth < 620);
+  private updateColumns() {
+    const changeAlignment = (this.ctx.$container && this.ctx.$container[0].offsetWidth < 620);
+    if (changeAlignment) {
+      this.columns = 1;
+    } else {
+      if (!this.isVerticalAlignment && this.settings.fieldsInRow) {
+        this.columns = this.settings.fieldsInRow;
+      } else {
+        this.columns = 1;
+      }
+    }
   }
 
   public onDataUpdated() {
@@ -501,7 +524,7 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
   }
 
   private resize() {
-    this.updateWidgetDisplaying();
+    this.updateColumns();
     this.ctx.detectChanges();
   }
 
@@ -547,6 +570,12 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
     return this.getTranslatedErrorText(errorMessage, defaultMessage, messageValues);
   }
 
+  public radioButtonSelectedColor(radioColor: string) {
+    if (isDefinedAndNotNull(radioColor)) {
+      return `--mdc-radio-selected-icon-color: ${radioColor}; --mdc-radio-selected-focus-icon-color: ${radioColor}; --mdc-radio-selected-hover-icon-color: ${radioColor}; --mdc-radio-selected-pressed-icon-color: ${radioColor}; --mat-radio-checked-ripple-color: ${radioColor};`
+    }
+  }
+
   public getTranslatedErrorText(errorMessage: string, defaultMessage: string, messageValues?: object): string {
     let messageText;
     if (errorMessage && errorMessage.length) {
@@ -586,7 +615,8 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
   }
 
   public inputChanged(source: MultipleInputWidgetSource, key: MultipleInputWidgetDataKey) {
-    if (!this.settings.showActionButtons && !this.isSavingInProgress && this.multipleInputFormGroup.get(key.formId).valid) {
+    const control = this.multipleInputFormGroup.get(key.formId);
+    if (!this.settings.showActionButtons && !this.isSavingInProgress && (Array.isArray(control.value) || control.valid)) {
       this.isSavingInProgress = true;
       const dataToSave: MultipleInputWidgetSource = {
         datasource: source.datasource,
@@ -594,6 +624,13 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
       };
       this.save(dataToSave);
     }
+  }
+
+  public colorChanged(source: MultipleInputWidgetSource, key: MultipleInputWidgetDataKey, color: string) {
+    this.multipleInputFormGroup.get(key.formId).setValue(color);
+    this.multipleInputFormGroup.get(key.formId).markAsDirty();
+    this.multipleInputFormGroup.get(key.formId).markAsTouched();
+    this.inputChanged(source, key);
   }
 
   public saveForm() {
@@ -734,7 +771,7 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
     this.multipleInputFormGroup.reset(undefined, {emitEvent: false});
     this.sources.forEach((source) => {
       for (const key of this.visibleKeys(source)) {
-        this.multipleInputFormGroup.get(key.formId).patchValue(key.value, {emitEvent: false});
+        this.multipleInputFormGroup.get(key.formId).patchValue(key.value);
       }
     });
     this.multipleInputFormGroup.markAsPristine();
@@ -750,20 +787,33 @@ export class MultipleInputWidgetComponent extends PageComponent implements OnIni
       panelClass: ['tb-dialog', 'tb-fullscreen-dialog'],
       data: {
         jsonValue: formControl.value,
+        required: key.settings.required,
         title:  key.settings.dialogTitle,
         saveLabel: key.settings.saveButtonLabel,
         cancelLabel: key.settings.cancelButtonLabel
       }
     }).afterClosed().subscribe(
       (res) => {
-        if (!isEqual(res, formControl.value)) {
+        if (isDefined(res) && !isEqual(res, formControl.value)) {
           formControl.patchValue(res);
           formControl.markAsDirty();
-          if(!this.settings.showActionButtons) {
+          if (!this.settings.showActionButtons) {
             this.inputChanged(source, key);
           }
         }
       }
     );
+  }
+
+  invalid(): boolean {
+    for (const source of this.sources) {
+      for (const key of this.visibleKeys(source)) {
+        const control = this.multipleInputFormGroup.get(key.formId);
+        if (!Array.isArray(control.value) && control.invalid) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

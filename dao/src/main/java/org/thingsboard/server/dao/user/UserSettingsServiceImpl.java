@@ -1,5 +1,5 @@
 /**
- * Copyright © 2016-2023 The Thingsboard Authors
+ * Copyright © 2016-2025 The Thingsboard Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package org.thingsboard.server.dao.user;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
@@ -31,7 +30,7 @@ import org.thingsboard.server.common.data.settings.UserSettings;
 import org.thingsboard.server.common.data.settings.UserSettingsCompositeKey;
 import org.thingsboard.server.common.data.settings.UserSettingsType;
 import org.thingsboard.server.dao.entity.AbstractCachedService;
-import org.thingsboard.server.dao.exception.DataValidationException;
+import org.thingsboard.server.exception.DataValidationException;
 import org.thingsboard.server.dao.service.ConstraintValidator;
 
 import java.util.Iterator;
@@ -49,14 +48,14 @@ public class UserSettingsServiceImpl extends AbstractCachedService<UserSettingsC
     @Override
     public UserSettings saveUserSettings(TenantId tenantId, UserSettings userSettings) {
         log.trace("Executing saveUserSettings for user [{}], [{}]", userSettings.getUserId(), userSettings);
-        validateId(userSettings.getUserId(), INCORRECT_USER_ID + userSettings.getUserId());
+        validateId(userSettings.getUserId(), id -> INCORRECT_USER_ID + id);
         return doSaveUserSettings(tenantId, userSettings);
     }
 
     @Override
     public void updateUserSettings(TenantId tenantId, UserId userId, UserSettingsType type, JsonNode settings) {
         log.trace("Executing updateUserSettings for user [{}], [{}]", userId, settings);
-        validateId(userId, INCORRECT_USER_ID + userId);
+        validateId(userId, id -> INCORRECT_USER_ID + id);
 
         var key = new UserSettingsCompositeKey(userId.getId(), type.name());
         UserSettings oldSettings = userSettingsDao.findById(tenantId, key);
@@ -72,7 +71,7 @@ public class UserSettingsServiceImpl extends AbstractCachedService<UserSettingsC
     @Override
     public UserSettings findUserSettings(TenantId tenantId, UserId userId, UserSettingsType type) {
         log.trace("Executing findUserSettings for user [{}]", userId);
-        validateId(userId, INCORRECT_USER_ID + userId);
+        validateId(userId, id -> INCORRECT_USER_ID + id);
 
         var key = new UserSettingsCompositeKey(userId.getId(), type.name());
         return cache.getAndPutInTransaction(key,
@@ -82,7 +81,7 @@ public class UserSettingsServiceImpl extends AbstractCachedService<UserSettingsC
     @Override
     public void deleteUserSettings(TenantId tenantId, UserId userId, UserSettingsType type, List<String> jsonPaths) {
         log.trace("Executing deleteUserSettings for user [{}]", userId);
-        validateId(userId, INCORRECT_USER_ID + userId);
+        validateId(userId, id -> INCORRECT_USER_ID + id);
         var key = new UserSettingsCompositeKey(userId.getId(), type.name());
         UserSettings userSettings = userSettingsDao.findById(tenantId, key);
         if (userSettings == null) {
@@ -93,7 +92,7 @@ public class UserSettingsServiceImpl extends AbstractCachedService<UserSettingsC
             for (String s : jsonPaths) {
                 dcSettings = dcSettings.delete("$." + s);
             }
-            userSettings.setSettings(new ObjectMapper().readValue(dcSettings.jsonString(), ObjectNode.class));
+            userSettings.setSettings(JacksonUtil.fromString(dcSettings.jsonString(), ObjectNode.class));
         } catch (Exception t) {
             handleEvictEvent(new UserSettingsEvictEvent(key));
             throw new RuntimeException(t);

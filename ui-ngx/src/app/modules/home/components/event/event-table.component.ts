@@ -1,5 +1,5 @@
 ///
-/// Copyright © 2016-2023 The Thingsboard Authors
+/// Copyright © 2016-2025 The Thingsboard Authors
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -18,9 +18,11 @@ import {
   AfterViewInit,
   ChangeDetectorRef,
   Component,
+  EventEmitter,
   Input,
   OnDestroy,
   OnInit,
+  Output,
   ViewChild,
   ViewContainerRef
 } from '@angular/core';
@@ -32,9 +34,12 @@ import { EntitiesTableComponent } from '@home/components/entity/entities-table.c
 import { EventTableConfig } from './event-table-config';
 import { EventService } from '@core/http/event.service';
 import { DialogService } from '@core/services/dialog.service';
-import { DebugEventType, EventType } from '@shared/models/event.models';
+import { DebugEventType, EventBody, EventType } from '@shared/models/event.models';
 import { Overlay } from '@angular/cdk/overlay';
 import { Subscription } from 'rxjs';
+import { isNotEmptyStr } from '@core/utils';
+import { Store } from '@ngrx/store';
+import { AppState } from '@core/core.state';
 
 @Component({
   selector: 'tb-event-table',
@@ -55,9 +60,31 @@ export class EventTableComponent implements OnInit, AfterViewInit, OnDestroy {
   @Input()
   debugEventTypes: Array<DebugEventType>;
 
+  @Input()
+  hideClearEventAction: boolean = false;
+
+  private disableDebugEventActionValue = false;
+
+  get disableDebugEventAction() {
+    return this.disableDebugEventActionValue;
+  }
+
+  @Input()
+  set disableDebugEventAction(value) {
+    this.disableDebugEventActionValue = value;
+    if (this.eventTableConfig) {
+      this.eventTableConfig.disableDebugEventAction = this.disableDebugEventAction;
+      this.eventTableConfig.updateCellAction();
+    }
+  };
+
   activeValue = false;
   dirtyValue = false;
   entityIdValue: EntityId;
+
+  get active(): boolean {
+    return this.activeValue;
+  }
 
   @Input()
   set active(active: boolean) {
@@ -83,6 +110,28 @@ export class EventTableComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private functionTestButtonLabelValue: string;
+
+  get functionTestButtonLabel(): string {
+    return this.functionTestButtonLabelValue;
+  }
+
+  @Input()
+  set functionTestButtonLabel(value: string) {
+    if (isNotEmptyStr(value)) {
+      this.functionTestButtonLabelValue = value;
+    } else {
+      this.functionTestButtonLabelValue = '';
+    }
+    if (this.eventTableConfig) {
+      this.eventTableConfig.testButtonLabel = this.functionTestButtonLabel;
+      this.eventTableConfig.updateCellAction();
+    }
+  }
+
+  @Output()
+  debugEventSelected = new EventEmitter<EventBody>();
+
   @ViewChild(EntitiesTableComponent, {static: true}) entitiesTable: EntitiesTableComponent;
 
   eventTableConfig: EventTableConfig;
@@ -96,6 +145,7 @@ export class EventTableComponent implements OnInit, AfterViewInit, OnDestroy {
               private dialog: MatDialog,
               private overlay: Overlay,
               private viewContainerRef: ViewContainerRef,
+              private store: Store<AppState>,
               private cd: ChangeDetectorRef) {
   }
 
@@ -114,12 +164,17 @@ export class EventTableComponent implements OnInit, AfterViewInit, OnDestroy {
       this.debugEventTypes,
       this.overlay,
       this.viewContainerRef,
-      this.cd
+      this.cd,
+      this.store,
+      this.functionTestButtonLabel,
+      this.debugEventSelected,
+      this.hideClearEventAction,
+      this.disableDebugEventAction
     );
   }
 
   ngAfterViewInit() {
-    this.isEmptyData$ = this.entitiesTable.dataSource.isEmpty().subscribe(value => this.eventTableConfig.hideClearEventAction = value);
+    this.isEmptyData$ = this.entitiesTable.dataSource.isEmpty().subscribe(value => this.eventTableConfig.hideClearEventAction = value || this.hideClearEventAction);
   }
 
   ngOnDestroy() {
